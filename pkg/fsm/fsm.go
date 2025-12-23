@@ -238,7 +238,7 @@ type Stats struct {
 	FencingCounter uint64
 }
 
-func (f *FSM) GetStats() Stats {
+func (f *FSM) Stats() Stats {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
