@@ -16,4 +16,7 @@ var (
 
 	// Fencing errors
 	ErrStaleToken = errors.New("fencing token is stale")
+
+	// Command errors
+	ErrUnknownCommand = errors.New("unknown command type")
 )

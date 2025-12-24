@@ -43,15 +43,15 @@ func (f *FSM) Apply(cmd types.Command) (any, error) {
 	defer f.mu.Unlock()
 
 	switch c := cmd.(type) {
-	case types.CreateLeaseCommand:
+	case types.CreateLeaseCmd:
 		return f.applyCreateLease(c)
-	case types.RenewLeaseCommand:
+	case types.RenewLeaseCmd:
 		return f.applyRenewLease(c)
-	case types.AcquireLockCommand:
+	case types.AcquireLockCmd:
 		return f.applyAcquireLock(c)
-	case types.ReleaseLockCommand:
+	case types.ReleaseLockCmd:
 		return f.applyReleaseLock(c)
-	case types.ExpireLeaseCommand:
+	case types.ExpireLeaseCmd:
 		return f.applyExpireLease(c)
 	default:
 		return nil, fmt.Errorf("unknown command type: %T", cmd)
@@ -64,7 +64,7 @@ type CreateLeaseResponse struct {
 	ExpiresAt tm.Duration
 }
 
-func (f *FSM) applyCreateLease(cmd types.CreateLeaseCommand) (any, error) {
+func (f *FSM) applyCreateLease(cmd types.CreateLeaseCmd) (any, error) {
 	if cmd.TTL <= 0 {
 		return nil, types.ErrInvalidLeaseTTL
 	}
@@ -94,7 +94,7 @@ type RenewLeaseResponse struct {
 	ExpiresAt tm.Duration
 }
 
-func (f *FSM) applyRenewLease(cmd types.RenewLeaseCommand) (any, error) {
+func (f *FSM) applyRenewLease(cmd types.RenewLeaseCmd) (any, error) {
 	lease, exists := f.leases[cmd.LeaseID]
 	if !exists {
 		return nil, types.ErrLeaseNotFound
@@ -117,7 +117,7 @@ type AcquireLockResponse struct {
 	FencingToken uint64
 }
 
-func (f *FSM) applyAcquireLock(cmd types.AcquireLockCommand) (any, error) {
+func (f *FSM) applyAcquireLock(cmd types.AcquireLockCmd) (any, error) {
 	lease, exists := f.leases[cmd.LeaseID]
 	if !exists {
 		return nil, types.ErrLeaseNotFound
@@ -168,7 +168,7 @@ type ReleaseLockResponse struct {
 	Released bool
 }
 
-func (f *FSM) applyReleaseLock(cmd types.ReleaseLockCommand) (any, error) {
+func (f *FSM) applyReleaseLock(cmd types.ReleaseLockCmd) (any, error) {
 	lock, held := f.locks[cmd.LockName]
 	if !held {
 		return nil, types.ErrLockNotFound
@@ -190,7 +190,7 @@ type ExpireLeaseResponse struct {
 	LocksReleased int
 }
 
-func (f *FSM) applyExpireLease(cmd types.ExpireLeaseCommand) (any, error) {
+func (f *FSM) applyExpireLease(cmd types.ExpireLeaseCmd) (any, error) {
 	lease, exists := f.leases[cmd.LeaseID]
 	if !exists {
 		return nil, types.ErrLeaseNotFound

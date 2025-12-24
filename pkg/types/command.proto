@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package types;
+
+option go_package = "github.com/pixperk/lowkey/pkg/types";
+
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  COMMAND_TYPE_CREATE_LEASE = 1;
+  COMMAND_TYPE_RENEW_LEASE = 2;
+  COMMAND_TYPE_ACQUIRE_LOCK = 3;
+  COMMAND_TYPE_RELEASE_LOCK = 4;
+  COMMAND_TYPE_EXPIRE_LEASE = 5;
+}
+
+// CreateLeaseCommand creates a new lease
+message CreateLeaseCommand {
+  string owner_id = 1;
+  int64 ttl_nanos = 2; // Duration in nanoseconds
+}
+
+// RenewLeaseCommand renews an existing lease
+message RenewLeaseCommand {
+  uint64 lease_id = 1;
+}
+
+// AcquireLockCommand acquires a lock with fencing
+message AcquireLockCommand {
+  string lock_name = 1;
+  string owner_id = 2;
+  uint64 lease_id = 3;
+}
+
+// ReleaseLockCommand releases a lock
+message ReleaseLockCommand {
+  string lock_name = 1;
+  uint64 lease_id = 2;
+}
+
+// ExpireLeaseCommand expires a lease and releases all its locks
+message ExpireLeaseCommand {
+  uint64 lease_id = 1;
+}
+
+// CommandWrapper wraps any command for serialization
+message CommandWrapper {
+  CommandType type = 1;
+  
+  // Only one of these will be set based on type
+  oneof payload {
+    CreateLeaseCommand create_lease = 2;
+    RenewLeaseCommand renew_lease = 3;
+    AcquireLockCommand acquire_lock = 4;
+    ReleaseLockCommand release_lock = 5;
+    ExpireLeaseCommand expire_lease = 6;
+  }
+}

@@ -14,7 +14,7 @@ import (
 func TestCreateLease(t *testing.T) {
 	fsm := NewFSM()
 
-	cmd := types.CreateLeaseCommand{
+	cmd := types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     10 * time.Second,
 	}
@@ -38,14 +38,14 @@ func TestRenewLease(t *testing.T) {
 	fsm := NewFSM()
 
 	// Create lease
-	createResp, _ := fsm.Apply(types.CreateLeaseCommand{
+	createResp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     5 * time.Second,
 	})
 	leaseID := createResp.(CreateLeaseResponse).LeaseID
 
 	// Renew lease
-	result, err := fsm.Apply(types.RenewLeaseCommand{
+	result, err := fsm.Apply(types.RenewLeaseCmd{
 		LeaseID: leaseID,
 	})
 
@@ -61,14 +61,14 @@ func TestAcquireLock(t *testing.T) {
 	fsm := NewFSM()
 
 	// Create lease first
-	createResp, _ := fsm.Apply(types.CreateLeaseCommand{
+	createResp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     10 * time.Second,
 	})
 	leaseID := createResp.(CreateLeaseResponse).LeaseID
 
 	// Acquire lock
-	result, err := fsm.Apply(types.AcquireLockCommand{
+	result, err := fsm.Apply(types.AcquireLockCmd{
 		LockName: "my-lock",
 		OwnerID:  "client-1",
 		LeaseID:  leaseID,
@@ -92,7 +92,7 @@ func TestFencingTokenMonotonicity(t *testing.T) {
 	fsm := NewFSM()
 
 	// Create lease
-	createResp, _ := fsm.Apply(types.CreateLeaseCommand{
+	createResp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     10 * time.Second,
 	})
@@ -104,7 +104,7 @@ func TestFencingTokenMonotonicity(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		lockName := fmt.Sprintf("lock-%d", i)
 
-		result, err := fsm.Apply(types.AcquireLockCommand{
+		result, err := fsm.Apply(types.AcquireLockCmd{
 			LockName: lockName,
 			OwnerID:  "client-1",
 			LeaseID:  leaseID,
@@ -129,20 +129,20 @@ func TestLockAlreadyHeld(t *testing.T) {
 	fsm := NewFSM()
 
 	// Create two leases
-	lease1Resp, _ := fsm.Apply(types.CreateLeaseCommand{
+	lease1Resp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     10 * time.Second,
 	})
 	lease1 := lease1Resp.(CreateLeaseResponse).LeaseID
 
-	lease2Resp, _ := fsm.Apply(types.CreateLeaseCommand{
+	lease2Resp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-2",
 		TTL:     10 * time.Second,
 	})
 	lease2 := lease2Resp.(CreateLeaseResponse).LeaseID
 
 	// Client 1 acquires lock
-	_, err := fsm.Apply(types.AcquireLockCommand{
+	_, err := fsm.Apply(types.AcquireLockCmd{
 		LockName: "my-lock",
 		OwnerID:  "client-1",
 		LeaseID:  lease1,
@@ -150,7 +150,7 @@ func TestLockAlreadyHeld(t *testing.T) {
 	require.NoError(t, err, "client 1 should acquire")
 
 	// Client 2 tries to acquire same lock (should fail)
-	_, err = fsm.Apply(types.AcquireLockCommand{
+	_, err = fsm.Apply(types.AcquireLockCmd{
 		LockName: "my-lock",
 		OwnerID:  "client-2",
 		LeaseID:  lease2,
@@ -164,20 +164,20 @@ func TestReleaseLock(t *testing.T) {
 	fsm := NewFSM()
 
 	// Create lease and acquire lock
-	createResp, _ := fsm.Apply(types.CreateLeaseCommand{
+	createResp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     10 * time.Second,
 	})
 	leaseID := createResp.(CreateLeaseResponse).LeaseID
 
-	fsm.Apply(types.AcquireLockCommand{
+	fsm.Apply(types.AcquireLockCmd{
 		LockName: "my-lock",
 		OwnerID:  "client-1",
 		LeaseID:  leaseID,
 	})
 
 	// Release lock
-	result, err := fsm.Apply(types.ReleaseLockCommand{
+	result, err := fsm.Apply(types.ReleaseLockCmd{
 		LockName: "my-lock",
 		LeaseID:  leaseID,
 	})
@@ -198,7 +198,7 @@ func TestExpireLeaseReleasesLocks(t *testing.T) {
 	fsm := NewFSM()
 
 	// Create lease
-	createResp, _ := fsm.Apply(types.CreateLeaseCommand{
+	createResp, _ := fsm.Apply(types.CreateLeaseCmd{
 		OwnerID: "client-1",
 		TTL:     10 * time.Second,
 	})
@@ -207,7 +207,7 @@ func TestExpireLeaseReleasesLocks(t *testing.T) {
 	// Acquire 3 locks
 	for i := 0; i < 3; i++ {
 		lockName := fmt.Sprintf("lock-%d", i)
-		fsm.Apply(types.AcquireLockCommand{
+		fsm.Apply(types.AcquireLockCmd{
 			LockName: lockName,
 			OwnerID:  "client-1",
 			LeaseID:  leaseID,
@@ -219,7 +219,7 @@ func TestExpireLeaseReleasesLocks(t *testing.T) {
 	assert.Equal(t, 3, stats.Locks)
 
 	// Expire the lease
-	result, err := fsm.Apply(types.ExpireLeaseCommand{
+	result, err := fsm.Apply(types.ExpireLeaseCmd{
 		LeaseID: leaseID,
 	})
 
@@ -242,7 +242,7 @@ func TestAcquireWithInvalidLease(t *testing.T) {
 	fsm := NewFSM()
 
 	// Try to acquire with non-existent lease
-	_, err := fsm.Apply(types.AcquireLockCommand{
+	_, err := fsm.Apply(types.AcquireLockCmd{
 		LockName: "my-lock",
 		OwnerID:  "client-1",
 		LeaseID:  999, // doesn't exist
