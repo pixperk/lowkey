@@ -110,3 +110,8 @@ func (s *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 // called when snapshot is no longer needed
 // we have no resources to clean up here
 func (s *fsmSnapshot) Release() {}
+
+// get the underlying FSM
+func (rf *RaftFSM) GetFSM() *FSM {
+	return rf.fsm
+}
