@@ -80,3 +80,85 @@ func TestSingleNodeSmoke(t *testing.T) {
 	assert.Equal(t, 1, stats.Leases, "should still have 1 lease")
 	assert.Equal(t, 0, stats.Locks, "should have 0 locks after release")
 }
+
+func TestStatePersistance(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	nodeID := uuid.New()
+
+	cfg := &Config{
+		NodeID:    nodeID,
+		BindAddr:  "127.0.0.1:7000", // fixed port for restart
+		DataDir:   tmpDir,
+		Bootstrap: true,
+	}
+
+	node1, err := NewNode(cfg)
+	require.NoError(t, err, "failed to create node1")
+
+	err = node1.WaitForLeader(5 * time.Second)
+	require.NoError(t, err)
+
+	//some commands to change state
+	createResult, err := node1.Apply(types.CreateLeaseCmd{
+		OwnerID: "client-1",
+		TTL:     10 * time.Second,
+	})
+	require.NoError(t, err)
+
+	createResp, ok := createResult.(fsm.CreateLeaseResponse)
+	require.True(t, ok)
+	leaseId := createResp.LeaseID
+
+	acquireResult, err := node1.Apply(types.AcquireLockCmd{
+		LockName: "my-lock",
+		OwnerID:  "client-1",
+		LeaseID:  leaseId,
+	})
+	require.NoError(t, err)
+
+	acquireResp, ok := acquireResult.(fsm.AcquireLockResponse)
+	require.True(t, ok)
+	assert.Equal(t, uint64(1), acquireResp.FencingToken)
+
+	originalToken := acquireResp.FencingToken
+
+	//stats before shutdown
+	statsBefore := node1.Stats()
+	assert.Equal(t, 1, statsBefore.Leases)
+	assert.Equal(t, 1, statsBefore.Locks)
+
+	//shutdown node
+	err = node1.Shutdown()
+	require.NoError(t, err, "failed to shutdown node1")
+
+	time.Sleep(500 * time.Millisecond)
+
+	//modify config to not bootstrap
+	cfg.Bootstrap = false
+
+	//restart node
+	node2, err := NewNode(cfg)
+	require.NoError(t, err, "failed to recreate node")
+	defer node2.Shutdown()
+
+	err = node2.WaitForLeader(5 * time.Second)
+	require.NoError(t, err)
+
+	//verify state after restart
+	statsAfter := node2.Stats()
+	assert.Equal(t, statsBefore.Leases, statsAfter.Leases, "leases count should persist after restart")
+	assert.Equal(t, statsBefore.Locks, statsAfter.Locks, "locks count should persist after restart")
+
+	//try to acquire the same lock again, should get next fencing token
+	acquireResult2, err := node2.Apply(types.AcquireLockCmd{
+		LockName: "another-lock",
+		OwnerID:  "client-1",
+		LeaseID:  leaseId,
+	})
+	require.NoError(t, err)
+
+	acquireResp2, ok := acquireResult2.(fsm.AcquireLockResponse)
+	require.True(t, ok)
+	assert.Equal(t, originalToken+1, acquireResp2.FencingToken, "fencing token should increment after restart")
+}

@@ -16,10 +16,12 @@ import (
 
 // wraps a raft inst with out fsm and provides a clean api
 type Node struct {
-	raft    *raft.Raft
-	fsm     *fsm.FSM
-	raftFSM *fsm.RaftFSM
-	cfg     *Config
+	raft      *raft.Raft
+	fsm       *fsm.FSM
+	raftFSM   *fsm.RaftFSM
+	transport *raft.NetworkTransport
+	storage   *storage.BoltDBStorage
+	cfg       *Config
 }
 
 type Config struct {
@@ -69,24 +71,33 @@ func NewNode(cfg *Config) (*Node, error) {
 
 	//bootstrap if needed
 	if cfg.Bootstrap {
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					ID:      raftCfg.LocalID,
-					Address: transport.LocalAddr(),
-				},
-			},
+		// Check if already bootstrapped
+		hasState, err := raft.HasExistingState(raftStorage.LogStore, raftStorage.StableStore, raftStorage.SnapshotStore)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check existing state: %w", err)
 		}
 
-		r.BootstrapCluster(configuration)
+		if !hasState {
+			configuration := raft.Configuration{
+				Servers: []raft.Server{
+					{
+						ID:      raftCfg.LocalID,
+						Address: transport.LocalAddr(),
+					},
+				},
+			}
 
+			r.BootstrapCluster(configuration)
+		}
 	}
 
 	return &Node{
-		raft:    r,
-		fsm:     stateMachine,
-		raftFSM: raftFSM,
-		cfg:     cfg,
+		raft:      r,
+		fsm:       stateMachine,
+		raftFSM:   raftFSM,
+		transport: transport,
+		storage:   raftStorage,
+		cfg:       cfg,
 	}, nil
 
 }
@@ -148,5 +159,16 @@ func (n *Node) Stats() fsm.Stats {
 
 // gracefully shuts down the Raft node
 func (n *Node) Shutdown() error {
-	return n.raft.Shutdown().Error()
+	// Shutdown Raft first
+	if err := n.raft.Shutdown().Error(); err != nil {
+		return err
+	}
+
+	// Close transport
+	if err := n.transport.Close(); err != nil {
+		return err
+	}
+
+	// Close BoltDB - CRITICAL for allowing restart!
+	return n.storage.Close()
 }
