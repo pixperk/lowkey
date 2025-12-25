@@ -1,10 +1,13 @@
 package raft
 
 import (
+	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/raft"
 	"github.com/pixperk/lowkey/pkg/fsm"
 	"github.com/pixperk/lowkey/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -161,4 +164,88 @@ func TestStatePersistance(t *testing.T) {
 	acquireResp2, ok := acquireResult2.(fsm.AcquireLockResponse)
 	require.True(t, ok)
 	assert.Equal(t, originalToken+1, acquireResp2.FencingToken, "fencing token should increment after restart")
+}
+
+func TestMultiNodeCluster(t *testing.T) {
+	//create 3 node cluster
+	nodes := make([]*Node, 3)
+	cfgs := make([]*Config, 3)
+
+	for i := 0; i < 3; i++ {
+		cfgs[i] = &Config{
+			NodeID:    uuid.New(),
+			BindAddr:  fmt.Sprintf("127.0.0.1:%d", 8000+i),
+			DataDir:   filepath.Join(t.TempDir(), fmt.Sprintf("node%d", i)),
+			Bootstrap: i == 0, //bootstrap only first node
+		}
+	}
+
+	var err error
+	nodes[0], err = NewNode(cfgs[0])
+	require.NoError(t, err, "failed to create node 0")
+	defer nodes[0].Shutdown()
+
+	err = nodes[0].WaitForLeader(5 * time.Second)
+	require.NoError(t, err, "no leader elected in cluster")
+	require.True(t, nodes[0].IsLeader(), "node 0 should be leader")
+
+	for i := 1; i < 3; i++ {
+		nodes[i], err = NewNode(cfgs[i])
+		require.NoError(t, err, fmt.Sprintf("failed to create node %d", i))
+		defer nodes[i].Shutdown()
+
+		future := nodes[0].raft.AddVoter(
+			raft.ServerID(cfgs[i].NodeID.String()),
+			raft.ServerAddress(cfgs[i].BindAddr),
+			0, 0,
+		)
+		require.NoError(t, future.Error(), fmt.Sprintf("failed to add node %d as voter", i))
+
+	}
+
+	time.Sleep(2 * time.Second)
+
+	var leader *Node
+	leaderCnt := 0
+
+	for _, node := range nodes {
+		if node.IsLeader() {
+			leader = node
+			leaderCnt++
+		}
+	}
+
+	require.Equal(t, 1, leaderCnt, "there should be exactly one leader")
+	require.NotNil(t, leader, "leader node should not be nil")
+
+	//apply command via leader
+	createResult, err := leader.Apply(types.CreateLeaseCmd{
+		OwnerID: "client-1",
+		TTL:     10 * time.Second,
+	})
+	require.NoError(t, err, "failed to create lease via leader")
+
+	createResp, ok := createResult.(fsm.CreateLeaseResponse)
+	require.True(t, ok, "expected CreateLeaseResponse from leader")
+	assert.NotZero(t, createResp.LeaseID, "lease ID should not be zero from leader")
+
+	acquireResult, err := leader.Apply(types.AcquireLockCmd{
+		LockName: "cluster-lock",
+		OwnerID:  "client-1",
+		LeaseID:  createResp.LeaseID,
+	})
+	require.NoError(t, err, "failed to acquire lock via leader")
+
+	acquireResp, ok := acquireResult.(fsm.AcquireLockResponse)
+	require.True(t, ok, "expected AcquireLockResponse from leader")
+	assert.Equal(t, uint64(1), acquireResp.FencingToken, "first lock should have token 1 from leader")
+
+	time.Sleep(1 * time.Second)
+
+	//all nodes should have the lease and lock
+	for i, node := range nodes {
+		stats := node.Stats()
+		assert.Equal(t, 1, stats.Leases, fmt.Sprintf("node %d should have 1 lease", i))
+		assert.Equal(t, 1, stats.Locks, fmt.Sprintf("node %d should have 1 lock", i))
+	}
 }
