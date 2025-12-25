@@ -248,3 +248,18 @@ func (f *FSM) Stats() Stats {
 		FencingCounter: f.fencingCounter,
 	}
 }
+
+// returns all lease IDs that have expired
+func (f *FSM) GetExpiredLeases(now tm.Duration) []uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	var expired []uint64
+	for leaseID, lease := range f.leases {
+		if lease.IsExpired(now) {
+			expired = append(expired, leaseID)
+		}
+	}
+
+	return expired
+}
