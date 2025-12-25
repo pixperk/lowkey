@@ -249,3 +249,72 @@ func TestMultiNodeCluster(t *testing.T) {
 		assert.Equal(t, 1, stats.Locks, fmt.Sprintf("node %d should have 1 lock", i))
 	}
 }
+
+func TestLeaderElection(t *testing.T) {
+	nodes := make([]*Node, 3)
+	cfgs := make([]*Config, 3)
+
+	for i := 0; i < 3; i++ {
+		cfgs[i] = &Config{
+			NodeID:    uuid.New(),
+			BindAddr:  fmt.Sprintf("127.0.0.1:%d", 9000+i),
+			DataDir:   filepath.Join(t.TempDir(), fmt.Sprintf("node%d", i)),
+			Bootstrap: i == 0, //bootstrap only first node
+		}
+	}
+
+	var err error
+	nodes[0], err = NewNode(cfgs[0])
+	require.NoError(t, err, "failed to create node 0")
+	defer nodes[0].Shutdown()
+
+	err = nodes[0].WaitForLeader(5 * time.Second)
+	require.NoError(t, err, "no leader elected in cluster")
+	require.True(t, nodes[0].IsLeader(), "node 0 should be leader")
+
+	for i := 1; i < 3; i++ {
+		nodes[i], err = NewNode(cfgs[i])
+		require.NoError(t, err, fmt.Sprintf("failed to create node %d", i))
+		defer nodes[i].Shutdown()
+
+		future := nodes[0].raft.AddVoter(
+			raft.ServerID(cfgs[i].NodeID.String()),
+			raft.ServerAddress(cfgs[i].BindAddr),
+			0, 0,
+		)
+		require.NoError(t, future.Error(), fmt.Sprintf("failed to add node %d as voter", i))
+	}
+
+	time.Sleep(2 * time.Second)
+
+	//shutdown leader
+	err = nodes[0].Shutdown()
+	require.NoError(t, err, "failed to shutdown leader node 0")
+
+	//wait for new leader election
+	time.Sleep(3 * time.Second)
+
+	var newLeader *Node
+	leaderCnt := 0
+
+	for i := 1; i < 3; i++ {
+		if nodes[i].IsLeader() {
+			newLeader = nodes[i]
+			leaderCnt++
+		}
+	}
+
+	require.Equal(t, 1, leaderCnt, "there should be exactly one new leader")
+	require.NotNil(t, newLeader, "new leader node should not be nil")
+
+	//verify cluster is functional
+	createResult, err := newLeader.Apply(types.CreateLeaseCmd{
+		OwnerID: "client-2",
+		TTL:     10 * time.Second,
+	})
+	require.NoError(t, err, "failed to create lease via new leader")
+
+	createResp, ok := createResult.(fsm.CreateLeaseResponse)
+	require.True(t, ok, "expected CreateLeaseResponse from new leader")
+	assert.NotZero(t, createResp.LeaseID, "lease ID should not be zero from new leader")
+}
