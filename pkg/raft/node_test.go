@@ -318,3 +318,86 @@ func TestLeaderElection(t *testing.T) {
 	require.True(t, ok, "expected CreateLeaseResponse from new leader")
 	assert.NotZero(t, createResp.LeaseID, "lease ID should not be zero from new leader")
 }
+
+func TestSnapshotAndRestore(t *testing.T) {
+	tmpDir := t.TempDir()
+	nodeID := uuid.New()
+
+	cfg := &Config{
+		NodeID:    nodeID,
+		BindAddr:  "127.0.0.1:10000",
+		DataDir:   tmpDir,
+		Bootstrap: true,
+	}
+
+	node, err := NewNode(cfg)
+	require.NoError(t, err, "failed to create node")
+
+	err = node.WaitForLeader(5 * time.Second)
+	require.NoError(t, err)
+
+	var leaseID uint64
+	for i := 0; i < 10; i++ {
+		createResult, err := node.Apply(types.CreateLeaseCmd{
+			OwnerID: fmt.Sprintf("client-%d", i),
+			TTL:     10 * time.Second,
+		})
+		require.NoError(t, err)
+
+		if i == 0 {
+			createResp := createResult.(fsm.CreateLeaseResponse)
+			leaseID = createResp.LeaseID
+		}
+	}
+
+	// Acquire a lock
+	acquireResult, err := node.Apply(types.AcquireLockCmd{
+		LockName: "snapshot-lock",
+		OwnerID:  "client-0",
+		LeaseID:  leaseID,
+	})
+	require.NoError(t, err)
+	acquireResp := acquireResult.(fsm.AcquireLockResponse)
+	originalToken := acquireResp.FencingToken
+
+	// Check stats before snapshot
+	statsBefore := node.Stats()
+	assert.Equal(t, 10, statsBefore.Leases)
+	assert.Equal(t, 1, statsBefore.Locks)
+
+	// Force a snapshot
+	future := node.raft.Snapshot()
+	require.NoError(t, future.Error(), "snapshot should succeed")
+
+	// Shutdown node
+	err = node.Shutdown()
+	require.NoError(t, err)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Restart node (should restore from snapshot)
+	cfg.Bootstrap = false
+	node2, err := NewNode(cfg)
+	require.NoError(t, err)
+	defer node2.Shutdown()
+
+	err = node2.WaitForLeader(5 * time.Second)
+	require.NoError(t, err)
+
+	// Verify state restored from snapshot
+	statsAfter := node2.Stats()
+	assert.Equal(t, statsBefore.Leases, statsAfter.Leases, "leases should be restored")
+	assert.Equal(t, statsBefore.Locks, statsAfter.Locks, "locks should be restored")
+
+	// Verify fencing counter persisted
+	acquireResult2, err := node2.Apply(types.AcquireLockCmd{
+		LockName: "another-lock",
+		OwnerID:  "client-0",
+		LeaseID:  leaseID,
+	})
+	require.NoError(t, err)
+
+	acquireResp2 := acquireResult2.(fsm.AcquireLockResponse)
+	assert.Greater(t, acquireResp2.FencingToken, originalToken, "fencing token should continue from snapshot")
+
+}
