@@ -142,6 +142,21 @@ func (n *Node) IsLeader() bool {
 	return n.raft.State() == raft.Leader
 }
 
+// returns this node's ID
+func (n *Node) GetNodeID() uuid.UUID {
+	return n.cfg.NodeID
+}
+
+// returns the current Raft state
+func (n *Node) GetState() raft.RaftState {
+	return n.raft.State()
+}
+
+// returns the current cluster size
+func (n *Node) GetClusterSize() int {
+	return len(n.raft.GetConfiguration().Configuration().Servers)
+}
+
 // returns the leader's address
 func (n *Node) GetLeader() string {
 	leaderAddr, _ := n.raft.LeaderWithID()

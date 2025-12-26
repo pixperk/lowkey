@@ -21,7 +21,6 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	LockService_CreateLease_FullMethodName = "/lowkey.v1.LockService/CreateLease"
 	LockService_RenewLease_FullMethodName  = "/lowkey.v1.LockService/RenewLease"
-	LockService_RevokeLease_FullMethodName = "/lowkey.v1.LockService/RevokeLease"
 	LockService_Heartbeat_FullMethodName   = "/lowkey.v1.LockService/Heartbeat"
 	LockService_AcquireLock_FullMethodName = "/lowkey.v1.LockService/AcquireLock"
 	LockService_ReleaseLock_FullMethodName = "/lowkey.v1.LockService/ReleaseLock"
@@ -35,7 +34,6 @@ type LockServiceClient interface {
 	// lease operations
 	CreateLease(ctx context.Context, in *CreateLeaseRequest, opts ...grpc.CallOption) (*CreateLeaseResponse, error)
 	RenewLease(ctx context.Context, in *RenewLeaseRequest, opts ...grpc.CallOption) (*RenewLeaseResponse, error)
-	RevokeLease(ctx context.Context, in *RevokeLeaseRequest, opts ...grpc.CallOption) (*RevokeLeaseResponse, error)
 	// heartbeat is a bi-directional streaming rpc to keep the lease alive
 	Heartbeat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[HeartbeatRequest, HeartbeatResponse], error)
 	// lock operations
@@ -67,16 +65,6 @@ func (c *lockServiceClient) RenewLease(ctx context.Context, in *RenewLeaseReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RenewLeaseResponse)
 	err := c.cc.Invoke(ctx, LockService_RenewLease_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *lockServiceClient) RevokeLease(ctx context.Context, in *RevokeLeaseRequest, opts ...grpc.CallOption) (*RevokeLeaseResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RevokeLeaseResponse)
-	err := c.cc.Invoke(ctx, LockService_RevokeLease_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +121,6 @@ type LockServiceServer interface {
 	// lease operations
 	CreateLease(context.Context, *CreateLeaseRequest) (*CreateLeaseResponse, error)
 	RenewLease(context.Context, *RenewLeaseRequest) (*RenewLeaseResponse, error)
-	RevokeLease(context.Context, *RevokeLeaseRequest) (*RevokeLeaseResponse, error)
 	// heartbeat is a bi-directional streaming rpc to keep the lease alive
 	Heartbeat(grpc.BidiStreamingServer[HeartbeatRequest, HeartbeatResponse]) error
 	// lock operations
@@ -156,9 +143,6 @@ func (UnimplementedLockServiceServer) CreateLease(context.Context, *CreateLeaseR
 }
 func (UnimplementedLockServiceServer) RenewLease(context.Context, *RenewLeaseRequest) (*RenewLeaseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenewLease not implemented")
-}
-func (UnimplementedLockServiceServer) RevokeLease(context.Context, *RevokeLeaseRequest) (*RevokeLeaseResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RevokeLease not implemented")
 }
 func (UnimplementedLockServiceServer) Heartbeat(grpc.BidiStreamingServer[HeartbeatRequest, HeartbeatResponse]) error {
 	return status.Error(codes.Unimplemented, "method Heartbeat not implemented")
@@ -225,24 +209,6 @@ func _LockService_RenewLease_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(LockServiceServer).RenewLease(ctx, req.(*RenewLeaseRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _LockService_RevokeLease_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RevokeLeaseRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(LockServiceServer).RevokeLease(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: LockService_RevokeLease_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LockServiceServer).RevokeLease(ctx, req.(*RevokeLeaseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -322,10 +288,6 @@ var LockService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RenewLease",
 			Handler:    _LockService_RenewLease_Handler,
-		},
-		{
-			MethodName: "RevokeLease",
-			Handler:    _LockService_RevokeLease_Handler,
 		},
 		{
 			MethodName: "AcquireLock",

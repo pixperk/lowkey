@@ -115,6 +115,7 @@ func (f *FSM) applyRenewLease(cmd types.RenewLeaseCmd) (any, error) {
 // returned when a lock is acquired
 type AcquireLockResponse struct {
 	FencingToken uint64
+	LeaseTTL     tm.Duration
 }
 
 func (f *FSM) applyAcquireLock(cmd types.AcquireLockCmd) (any, error) {
@@ -159,6 +160,7 @@ func (f *FSM) applyAcquireLock(cmd types.AcquireLockCmd) (any, error) {
 
 	return AcquireLockResponse{
 		FencingToken: fencingToken,
+		LeaseTTL:     lease.TTL,
 	}, nil
 
 }
