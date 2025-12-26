@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,13 +17,14 @@ import (
 
 // wraps a raft inst with out fsm and provides a clean api
 type Node struct {
-	raft      *raft.Raft
-	fsm       *fsm.FSM
-	raftFSM   *fsm.RaftFSM
-	transport *raft.NetworkTransport
-	storage   *storage.BoltDBStorage
-	cfg       *Config
-	stopch    chan struct{}
+	raft         *raft.Raft
+	fsm          *fsm.FSM
+	raftFSM      *fsm.RaftFSM
+	transport    *raft.NetworkTransport
+	storage      *storage.BoltDBStorage
+	cfg          *Config
+	stopch       chan struct{}
+	shutdownOnce sync.Once // ensure shutdown is only called once
 }
 
 type Config struct {
@@ -125,7 +127,14 @@ func (n *Node) Apply(cmd types.Command) (any, error) {
 		return nil, fmt.Errorf("failed to apply command: %w", err)
 	}
 
-	return future.Response(), nil
+	response := future.Response()
+
+	//if FSM returned an error, return it as error
+	if err, ok := response.(error); ok {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 // returns true if this node is the leader
@@ -164,18 +173,21 @@ func (n *Node) Stats() fsm.Stats {
 
 // gracefully shuts down the Raft node
 func (n *Node) Shutdown() error {
-	// Shutdown Raft first
-	if err := n.raft.Shutdown().Error(); err != nil {
-		return err
-	}
+	var err error
+	n.shutdownOnce.Do(func() {
+		close(n.stopch)
 
-	// Close transport
-	if err := n.transport.Close(); err != nil {
-		return err
-	}
+		future := n.raft.Shutdown()
+		err = future.Error()
+		if err != nil {
+			err = fmt.Errorf("failed to shutdown raft: %w", err)
+			return
+		}
 
-	// Close BoltDB - CRITICAL for allowing restart!
-	return n.storage.Close()
+		n.transport.Close()
+		n.storage.Close()
+	})
+	return err
 }
 
 // background loop to expire leases
@@ -193,8 +205,8 @@ func (n *Node) leaseExpiryLoop() {
 			}
 
 			now := n.fsm.CurrentTime()
-			expured := n.fsm.GetExpiredLeases(now)
-			for _, leaseID := range expured {
+			expired := n.fsm.GetExpiredLeases(now)
+			for _, leaseID := range expired {
 				cmd := types.ExpireLeaseCmd{
 					LeaseID: leaseID,
 				}
