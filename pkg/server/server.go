@@ -72,9 +72,9 @@ func (s *Server) RenewLease(ctx context.Context, req *pb.RenewLeaseRequest) (*pb
 	}
 
 	resp := result.(fsm.RenewLeaseResponse)
-	ttlRemaining := resp.ExpiresAt
+	ttlRemaining := resp.TTL.Seconds()
 	return &pb.RenewLeaseResponse{
-		TtlSeconds: int64(ttlRemaining.Seconds()),
+		TtlSeconds: int64(ttlRemaining),
 	}, nil
 }
 
@@ -155,11 +155,12 @@ func (s *Server) Heartbeat(stream pb.LockService_HeartbeatServer) error {
 		}
 
 		resp := result.(fsm.RenewLeaseResponse)
-		ttlRemaining := resp.ExpiresAt
+		ttlRemaining := resp.TTL.Seconds()
 
+		//send heartbeat response to client
 		err = stream.Send(&pb.HeartbeatResponse{
 			LeaseId:    req.LeaseId,
-			TtlSeconds: int64(ttlRemaining.Seconds()),
+			TtlSeconds: int64(ttlRemaining),
 		})
 
 		if err != nil {

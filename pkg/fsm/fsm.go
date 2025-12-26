@@ -92,6 +92,7 @@ func (f *FSM) applyCreateLease(cmd types.CreateLeaseCmd) (any, error) {
 // returned when a lease is renewed
 type RenewLeaseResponse struct {
 	ExpiresAt tm.Duration
+	TTL       tm.Duration
 }
 
 func (f *FSM) applyRenewLease(cmd types.RenewLeaseCmd) (any, error) {
@@ -109,6 +110,7 @@ func (f *FSM) applyRenewLease(cmd types.RenewLeaseCmd) (any, error) {
 
 	return RenewLeaseResponse{
 		ExpiresAt: lease.ExpiresAt,
+		TTL:       lease.TTL,
 	}, nil
 }
 
