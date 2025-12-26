@@ -263,3 +263,7 @@ func (f *FSM) GetExpiredLeases(now tm.Duration) []uint64 {
 
 	return expired
 }
+
+func (f *FSM) CurrentTime() tm.Duration {
+	return f.clock.Elapsed()
+}

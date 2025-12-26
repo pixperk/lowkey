@@ -22,6 +22,7 @@ type Node struct {
 	transport *raft.NetworkTransport
 	storage   *storage.BoltDBStorage
 	cfg       *Config
+	stopch    chan struct{}
 }
 
 type Config struct {
@@ -91,15 +92,19 @@ func NewNode(cfg *Config) (*Node, error) {
 		}
 	}
 
-	return &Node{
+	node := &Node{
 		raft:      r,
 		fsm:       stateMachine,
 		raftFSM:   raftFSM,
 		transport: transport,
 		storage:   raftStorage,
 		cfg:       cfg,
-	}, nil
+		stopch:    make(chan struct{}),
+	}
 
+	go node.leaseExpiryLoop()
+
+	return node, nil
 }
 
 // apply a command to the Raft cluster
@@ -171,4 +176,30 @@ func (n *Node) Shutdown() error {
 
 	// Close BoltDB - CRITICAL for allowing restart!
 	return n.storage.Close()
+}
+
+// background loop to expire leases
+func (n *Node) leaseExpiryLoop() {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-n.stopch:
+			return
+		case <-ticker.C:
+			if !n.IsLeader() {
+				continue
+			}
+
+			now := n.fsm.CurrentTime()
+			expured := n.fsm.GetExpiredLeases(now)
+			for _, leaseID := range expured {
+				cmd := types.ExpireLeaseCmd{
+					LeaseID: leaseID,
+				}
+				_, _ = n.Apply(cmd)
+			}
+		}
+	}
 }
