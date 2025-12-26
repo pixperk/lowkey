@@ -4,20 +4,49 @@ package lowkey.v1;
 
 option go_package = "github.com/pixperk/lowkey/api/v1";
 
+import "google/api/annotations.proto";
+
 service LockService{
     //lease operations
-    rpc CreateLease(CreateLeaseRequest) returns (CreateLeaseResponse);
-    rpc RenewLease(RenewLeaseRequest) returns (RenewLeaseResponse);
+    rpc CreateLease(CreateLeaseRequest) returns (CreateLeaseResponse) {
+        option (google.api.http) = {
+            post: "/v1/lease"
+            body: "*"
+        };
+    }
+
+    rpc RenewLease(RenewLeaseRequest) returns (RenewLeaseResponse) {
+        option (google.api.http) = {
+            post: "/v1/lease/renew"
+            body: "*"
+        };
+    }
 
     //heartbeat is a bi-directional streaming rpc to keep the lease alive
+    // Note: Streaming RPCs don't map to HTTP, clients should use gRPC for this
     rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse);
 
     //lock operations
-    rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse);
-    rpc ReleaseLock(ReleaseLockRequest) returns (ReleaseLockResponse);
+    rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse) {
+        option (google.api.http) = {
+            post: "/v1/lock/acquire"
+            body: "*"
+        };
+    }
+
+    rpc ReleaseLock(ReleaseLockRequest) returns (ReleaseLockResponse) {
+        option (google.api.http) = {
+            post: "/v1/lock/release"
+            body: "*"
+        };
+    }
 
     //cluster status
-    rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+    rpc GetStatus(GetStatusRequest) returns (GetStatusResponse) {
+        option (google.api.http) = {
+            get: "/v1/status"
+        };
+    }
 }
 
 message CreateLeaseRequest {

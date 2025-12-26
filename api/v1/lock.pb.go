@@ -2,11 +2,12 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v3.21.12
-// source: api/proto/lock.proto
+// source: lock.proto
 
 package v1
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -31,7 +32,7 @@ type CreateLeaseRequest struct {
 
 func (x *CreateLeaseRequest) Reset() {
 	*x = CreateLeaseRequest{}
-	mi := &file_api_proto_lock_proto_msgTypes[0]
+	mi := &file_lock_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +44,7 @@ func (x *CreateLeaseRequest) String() string {
 func (*CreateLeaseRequest) ProtoMessage() {}
 
 func (x *CreateLeaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[0]
+	mi := &file_lock_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +57,7 @@ func (x *CreateLeaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateLeaseRequest.ProtoReflect.Descriptor instead.
 func (*CreateLeaseRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{0}
+	return file_lock_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CreateLeaseRequest) GetOwnerId() string {
@@ -83,7 +84,7 @@ type CreateLeaseResponse struct {
 
 func (x *CreateLeaseResponse) Reset() {
 	*x = CreateLeaseResponse{}
-	mi := &file_api_proto_lock_proto_msgTypes[1]
+	mi := &file_lock_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -95,7 +96,7 @@ func (x *CreateLeaseResponse) String() string {
 func (*CreateLeaseResponse) ProtoMessage() {}
 
 func (x *CreateLeaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[1]
+	mi := &file_lock_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -108,7 +109,7 @@ func (x *CreateLeaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateLeaseResponse.ProtoReflect.Descriptor instead.
 func (*CreateLeaseResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{1}
+	return file_lock_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CreateLeaseResponse) GetLeaseId() uint64 {
@@ -134,7 +135,7 @@ type RenewLeaseRequest struct {
 
 func (x *RenewLeaseRequest) Reset() {
 	*x = RenewLeaseRequest{}
-	mi := &file_api_proto_lock_proto_msgTypes[2]
+	mi := &file_lock_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -146,7 +147,7 @@ func (x *RenewLeaseRequest) String() string {
 func (*RenewLeaseRequest) ProtoMessage() {}
 
 func (x *RenewLeaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[2]
+	mi := &file_lock_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -159,7 +160,7 @@ func (x *RenewLeaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewLeaseRequest.ProtoReflect.Descriptor instead.
 func (*RenewLeaseRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{2}
+	return file_lock_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RenewLeaseRequest) GetLeaseId() uint64 {
@@ -178,7 +179,7 @@ type RenewLeaseResponse struct {
 
 func (x *RenewLeaseResponse) Reset() {
 	*x = RenewLeaseResponse{}
-	mi := &file_api_proto_lock_proto_msgTypes[3]
+	mi := &file_lock_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -190,7 +191,7 @@ func (x *RenewLeaseResponse) String() string {
 func (*RenewLeaseResponse) ProtoMessage() {}
 
 func (x *RenewLeaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[3]
+	mi := &file_lock_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -203,7 +204,7 @@ func (x *RenewLeaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewLeaseResponse.ProtoReflect.Descriptor instead.
 func (*RenewLeaseResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{3}
+	return file_lock_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RenewLeaseResponse) GetTtlSeconds() int64 {
@@ -222,7 +223,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_api_proto_lock_proto_msgTypes[4]
+	mi := &file_lock_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -234,7 +235,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[4]
+	mi := &file_lock_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -247,7 +248,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{4}
+	return file_lock_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HeartbeatRequest) GetLeaseId() uint64 {
@@ -267,7 +268,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_api_proto_lock_proto_msgTypes[5]
+	mi := &file_lock_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +280,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[5]
+	mi := &file_lock_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +293,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{5}
+	return file_lock_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *HeartbeatResponse) GetLeaseId() uint64 {
@@ -320,7 +321,7 @@ type AcquireLockRequest struct {
 
 func (x *AcquireLockRequest) Reset() {
 	*x = AcquireLockRequest{}
-	mi := &file_api_proto_lock_proto_msgTypes[6]
+	mi := &file_lock_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +333,7 @@ func (x *AcquireLockRequest) String() string {
 func (*AcquireLockRequest) ProtoMessage() {}
 
 func (x *AcquireLockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[6]
+	mi := &file_lock_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +346,7 @@ func (x *AcquireLockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcquireLockRequest.ProtoReflect.Descriptor instead.
 func (*AcquireLockRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{6}
+	return file_lock_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AcquireLockRequest) GetLockName() string {
@@ -379,7 +380,7 @@ type AcquireLockResponse struct {
 
 func (x *AcquireLockResponse) Reset() {
 	*x = AcquireLockResponse{}
-	mi := &file_api_proto_lock_proto_msgTypes[7]
+	mi := &file_lock_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +392,7 @@ func (x *AcquireLockResponse) String() string {
 func (*AcquireLockResponse) ProtoMessage() {}
 
 func (x *AcquireLockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[7]
+	mi := &file_lock_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +405,7 @@ func (x *AcquireLockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcquireLockResponse.ProtoReflect.Descriptor instead.
 func (*AcquireLockResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{7}
+	return file_lock_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AcquireLockResponse) GetFencingToken() uint64 {
@@ -431,7 +432,7 @@ type ReleaseLockRequest struct {
 
 func (x *ReleaseLockRequest) Reset() {
 	*x = ReleaseLockRequest{}
-	mi := &file_api_proto_lock_proto_msgTypes[8]
+	mi := &file_lock_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -443,7 +444,7 @@ func (x *ReleaseLockRequest) String() string {
 func (*ReleaseLockRequest) ProtoMessage() {}
 
 func (x *ReleaseLockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[8]
+	mi := &file_lock_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -456,7 +457,7 @@ func (x *ReleaseLockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseLockRequest.ProtoReflect.Descriptor instead.
 func (*ReleaseLockRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{8}
+	return file_lock_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ReleaseLockRequest) GetLockName() string {
@@ -482,7 +483,7 @@ type ReleaseLockResponse struct {
 
 func (x *ReleaseLockResponse) Reset() {
 	*x = ReleaseLockResponse{}
-	mi := &file_api_proto_lock_proto_msgTypes[9]
+	mi := &file_lock_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -494,7 +495,7 @@ func (x *ReleaseLockResponse) String() string {
 func (*ReleaseLockResponse) ProtoMessage() {}
 
 func (x *ReleaseLockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[9]
+	mi := &file_lock_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -507,7 +508,7 @@ func (x *ReleaseLockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseLockResponse.ProtoReflect.Descriptor instead.
 func (*ReleaseLockResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{9}
+	return file_lock_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ReleaseLockResponse) GetReleased() bool {
@@ -525,7 +526,7 @@ type GetStatusRequest struct {
 
 func (x *GetStatusRequest) Reset() {
 	*x = GetStatusRequest{}
-	mi := &file_api_proto_lock_proto_msgTypes[10]
+	mi := &file_lock_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +538,7 @@ func (x *GetStatusRequest) String() string {
 func (*GetStatusRequest) ProtoMessage() {}
 
 func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[10]
+	mi := &file_lock_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +551,7 @@ func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetStatusRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{10}
+	return file_lock_proto_rawDescGZIP(), []int{10}
 }
 
 type GetStatusResponse struct {
@@ -567,7 +568,7 @@ type GetStatusResponse struct {
 
 func (x *GetStatusResponse) Reset() {
 	*x = GetStatusResponse{}
-	mi := &file_api_proto_lock_proto_msgTypes[11]
+	mi := &file_lock_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -579,7 +580,7 @@ func (x *GetStatusResponse) String() string {
 func (*GetStatusResponse) ProtoMessage() {}
 
 func (x *GetStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[11]
+	mi := &file_lock_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -592,7 +593,7 @@ func (x *GetStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetStatusResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{11}
+	return file_lock_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetStatusResponse) GetNodeId() string {
@@ -648,7 +649,7 @@ type Stats struct {
 
 func (x *Stats) Reset() {
 	*x = Stats{}
-	mi := &file_api_proto_lock_proto_msgTypes[12]
+	mi := &file_lock_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +661,7 @@ func (x *Stats) String() string {
 func (*Stats) ProtoMessage() {}
 
 func (x *Stats) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_lock_proto_msgTypes[12]
+	mi := &file_lock_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +674,7 @@ func (x *Stats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stats.ProtoReflect.Descriptor instead.
 func (*Stats) Descriptor() ([]byte, []int) {
-	return file_api_proto_lock_proto_rawDescGZIP(), []int{12}
+	return file_lock_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Stats) GetLeases() int32 {
@@ -697,11 +698,12 @@ func (x *Stats) GetFencingCounter() uint64 {
 	return 0
 }
 
-var File_api_proto_lock_proto protoreflect.FileDescriptor
+var File_lock_proto protoreflect.FileDescriptor
 
-const file_api_proto_lock_proto_rawDesc = "" +
+const file_lock_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/proto/lock.proto\x12\tlowkey.v1\"P\n" +
+	"\n" +
+	"lock.proto\x12\tlowkey.v1\x1a\x1cgoogle/api/annotations.proto\"P\n" +
 	"\x12CreateLeaseRequest\x12\x19\n" +
 	"\bowner_id\x18\x01 \x01(\tR\aownerId\x12\x1f\n" +
 	"\vttl_seconds\x18\x02 \x01(\x03R\n" +
@@ -744,30 +746,31 @@ const file_api_proto_lock_proto_rawDesc = "" +
 	"\x05Stats\x12\x16\n" +
 	"\x06leases\x18\x01 \x01(\x05R\x06leases\x12\x14\n" +
 	"\x05locks\x18\x02 \x01(\x05R\x05locks\x12'\n" +
-	"\x0ffencing_counter\x18\x03 \x01(\x04R\x0efencingCounter2\xd6\x03\n" +
-	"\vLockService\x12L\n" +
-	"\vCreateLease\x12\x1d.lowkey.v1.CreateLeaseRequest\x1a\x1e.lowkey.v1.CreateLeaseResponse\x12I\n" +
+	"\x0ffencing_counter\x18\x03 \x01(\x04R\x0efencingCounter2\xd6\x04\n" +
+	"\vLockService\x12b\n" +
+	"\vCreateLease\x12\x1d.lowkey.v1.CreateLeaseRequest\x1a\x1e.lowkey.v1.CreateLeaseResponse\"\x14\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/lease\x12e\n" +
 	"\n" +
-	"RenewLease\x12\x1c.lowkey.v1.RenewLeaseRequest\x1a\x1d.lowkey.v1.RenewLeaseResponse\x12J\n" +
-	"\tHeartbeat\x12\x1b.lowkey.v1.HeartbeatRequest\x1a\x1c.lowkey.v1.HeartbeatResponse(\x010\x01\x12L\n" +
-	"\vAcquireLock\x12\x1d.lowkey.v1.AcquireLockRequest\x1a\x1e.lowkey.v1.AcquireLockResponse\x12L\n" +
-	"\vReleaseLock\x12\x1d.lowkey.v1.ReleaseLockRequest\x1a\x1e.lowkey.v1.ReleaseLockResponse\x12F\n" +
-	"\tGetStatus\x12\x1b.lowkey.v1.GetStatusRequest\x1a\x1c.lowkey.v1.GetStatusResponseB\"Z github.com/pixperk/lowkey/api/v1b\x06proto3"
+	"RenewLease\x12\x1c.lowkey.v1.RenewLeaseRequest\x1a\x1d.lowkey.v1.RenewLeaseResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/lease/renew\x12J\n" +
+	"\tHeartbeat\x12\x1b.lowkey.v1.HeartbeatRequest\x1a\x1c.lowkey.v1.HeartbeatResponse(\x010\x01\x12i\n" +
+	"\vAcquireLock\x12\x1d.lowkey.v1.AcquireLockRequest\x1a\x1e.lowkey.v1.AcquireLockResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/lock/acquire\x12i\n" +
+	"\vReleaseLock\x12\x1d.lowkey.v1.ReleaseLockRequest\x1a\x1e.lowkey.v1.ReleaseLockResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/lock/release\x12Z\n" +
+	"\tGetStatus\x12\x1b.lowkey.v1.GetStatusRequest\x1a\x1c.lowkey.v1.GetStatusResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
+	"/v1/statusB\"Z github.com/pixperk/lowkey/api/v1b\x06proto3"
 
 var (
-	file_api_proto_lock_proto_rawDescOnce sync.Once
-	file_api_proto_lock_proto_rawDescData []byte
+	file_lock_proto_rawDescOnce sync.Once
+	file_lock_proto_rawDescData []byte
 )
 
-func file_api_proto_lock_proto_rawDescGZIP() []byte {
-	file_api_proto_lock_proto_rawDescOnce.Do(func() {
-		file_api_proto_lock_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_lock_proto_rawDesc), len(file_api_proto_lock_proto_rawDesc)))
+func file_lock_proto_rawDescGZIP() []byte {
+	file_lock_proto_rawDescOnce.Do(func() {
+		file_lock_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_lock_proto_rawDesc), len(file_lock_proto_rawDesc)))
 	})
-	return file_api_proto_lock_proto_rawDescData
+	return file_lock_proto_rawDescData
 }
 
-var file_api_proto_lock_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
-var file_api_proto_lock_proto_goTypes = []any{
+var file_lock_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_lock_proto_goTypes = []any{
 	(*CreateLeaseRequest)(nil),  // 0: lowkey.v1.CreateLeaseRequest
 	(*CreateLeaseResponse)(nil), // 1: lowkey.v1.CreateLeaseResponse
 	(*RenewLeaseRequest)(nil),   // 2: lowkey.v1.RenewLeaseRequest
@@ -782,7 +785,7 @@ var file_api_proto_lock_proto_goTypes = []any{
 	(*GetStatusResponse)(nil),   // 11: lowkey.v1.GetStatusResponse
 	(*Stats)(nil),               // 12: lowkey.v1.Stats
 }
-var file_api_proto_lock_proto_depIdxs = []int32{
+var file_lock_proto_depIdxs = []int32{
 	12, // 0: lowkey.v1.GetStatusResponse.stats:type_name -> lowkey.v1.Stats
 	0,  // 1: lowkey.v1.LockService.CreateLease:input_type -> lowkey.v1.CreateLeaseRequest
 	2,  // 2: lowkey.v1.LockService.RenewLease:input_type -> lowkey.v1.RenewLeaseRequest
@@ -803,26 +806,26 @@ var file_api_proto_lock_proto_depIdxs = []int32{
 	0,  // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_api_proto_lock_proto_init() }
-func file_api_proto_lock_proto_init() {
-	if File_api_proto_lock_proto != nil {
+func init() { file_lock_proto_init() }
+func file_lock_proto_init() {
+	if File_lock_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_lock_proto_rawDesc), len(file_api_proto_lock_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lock_proto_rawDesc), len(file_lock_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_api_proto_lock_proto_goTypes,
-		DependencyIndexes: file_api_proto_lock_proto_depIdxs,
-		MessageInfos:      file_api_proto_lock_proto_msgTypes,
+		GoTypes:           file_lock_proto_goTypes,
+		DependencyIndexes: file_lock_proto_depIdxs,
+		MessageInfos:      file_lock_proto_msgTypes,
 	}.Build()
-	File_api_proto_lock_proto = out.File
-	file_api_proto_lock_proto_goTypes = nil
-	file_api_proto_lock_proto_depIdxs = nil
+	File_lock_proto = out.File
+	file_lock_proto_goTypes = nil
+	file_lock_proto_depIdxs = nil
 }

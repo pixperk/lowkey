@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v3.21.12
-// source: api/proto/lock.proto
+// source: lock.proto
 
 package v1
 
@@ -35,6 +35,7 @@ type LockServiceClient interface {
 	CreateLease(ctx context.Context, in *CreateLeaseRequest, opts ...grpc.CallOption) (*CreateLeaseResponse, error)
 	RenewLease(ctx context.Context, in *RenewLeaseRequest, opts ...grpc.CallOption) (*RenewLeaseResponse, error)
 	// heartbeat is a bi-directional streaming rpc to keep the lease alive
+	// Note: Streaming RPCs don't map to HTTP, clients should use gRPC for this
 	Heartbeat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[HeartbeatRequest, HeartbeatResponse], error)
 	// lock operations
 	AcquireLock(ctx context.Context, in *AcquireLockRequest, opts ...grpc.CallOption) (*AcquireLockResponse, error)
@@ -122,6 +123,7 @@ type LockServiceServer interface {
 	CreateLease(context.Context, *CreateLeaseRequest) (*CreateLeaseResponse, error)
 	RenewLease(context.Context, *RenewLeaseRequest) (*RenewLeaseResponse, error)
 	// heartbeat is a bi-directional streaming rpc to keep the lease alive
+	// Note: Streaming RPCs don't map to HTTP, clients should use gRPC for this
 	Heartbeat(grpc.BidiStreamingServer[HeartbeatRequest, HeartbeatResponse]) error
 	// lock operations
 	AcquireLock(context.Context, *AcquireLockRequest) (*AcquireLockResponse, error)
@@ -310,5 +312,5 @@ var LockService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "api/proto/lock.proto",
+	Metadata: "lock.proto",
 }
