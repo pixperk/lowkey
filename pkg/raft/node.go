@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	"github.com/pixperk/lowkey/pkg/fsm"
+	"github.com/pixperk/lowkey/pkg/metrics"
 	"github.com/pixperk/lowkey/pkg/storage"
 	"github.com/pixperk/lowkey/pkg/types"
 	"google.golang.org/protobuf/proto"
@@ -105,6 +106,7 @@ func NewNode(cfg *Config) (*Node, error) {
 	}
 
 	go node.leaseExpiryLoop()
+	go node.metricsCollectorLoop()
 
 	return node, nil
 }
@@ -242,6 +244,43 @@ func (n *Node) leaseExpiryLoop() {
 					LeaseID: leaseID,
 				}
 				_, _ = n.Apply(cmd)
+			}
+		}
+	}
+}
+
+// background loop to update raft health metrics
+// runs on all nodes (leader and followers)
+func (n *Node) metricsCollectorLoop() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-n.stopch:
+			return
+		case <-ticker.C:
+			// update leader status: 1 if leader, 0 if follower
+			if n.IsLeader() {
+				metrics.RaftIsLeader.Set(1)
+			} else {
+				metrics.RaftIsLeader.Set(0)
+			}
+
+			// update cluster size (number of peers including self)
+			config := n.raft.GetConfiguration()
+			if err := config.Error(); err == nil {
+				metrics.RaftPeers.Set(float64(len(config.Configuration().Servers)))
+			}
+
+			// update last applied index (shows replication progress)
+			stats := n.raft.Stats()
+			// stats["last_log_index"] is the last index in the log
+			// stats["applied_index"] is the last index applied to FSM
+			if appliedIndex, ok := stats["applied_index"]; ok {
+				var index uint64
+				fmt.Sscanf(appliedIndex, "%d", &index)
+				metrics.RaftAppliedIndex.Set(float64(index))
 			}
 		}
 	}
