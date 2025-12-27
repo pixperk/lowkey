@@ -141,26 +141,17 @@ func (s *Server) Heartbeat(stream pb.LockService_HeartbeatServer) error {
 			return err
 		}
 
-		if !s.node.IsLeader() {
-			return notLeaderError(s.node.GetLeader())
-		}
-
-		//renew the lease
-		result, err := s.node.Apply(types.RenewLeaseCmd{
-			LeaseID: req.LeaseId,
-		})
-
+		// Leader-only lease renewal (no Raft consensus needed)
+		// Node validates leadership before executing
+		ttl, err := s.node.RenewLeaseLocal(req.LeaseId)
 		if err != nil {
 			return toGRPCError(err)
 		}
 
-		resp := result.(fsm.RenewLeaseResponse)
-		ttlRemaining := resp.TTL.Seconds()
-
 		//send heartbeat response to client
 		err = stream.Send(&pb.HeartbeatResponse{
 			LeaseId:    req.LeaseId,
-			TtlSeconds: int64(ttlRemaining),
+			TtlSeconds: int64(ttl.Seconds()),
 		})
 
 		if err != nil {

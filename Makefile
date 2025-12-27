@@ -1,4 +1,4 @@
-.PHONY: proto test
+.PHONY: proto test bench
 
 proto:
 	# Generate internal command types
@@ -20,3 +20,15 @@ test:
 test-coverage:
 	go test ./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out
+
+# Benchmark targets
+bench-contention:
+	go run examples/benchmark/main.go -mode=contention -clients=5 -duration=20s
+
+bench-parallel:
+	go run examples/benchmark/main.go -mode=parallel -clients=5 -duration=20s
+
+bench-sequential:
+	go run examples/benchmark/main.go -mode=sequential -duration=20s
+
+bench-all: bench-sequential bench-parallel bench-contention

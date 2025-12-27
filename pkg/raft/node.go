@@ -163,6 +163,22 @@ func (n *Node) GetLeader() string {
 	return string(leaderAddr)
 }
 
+func (n *Node) GetFSM() *fsm.FSM {
+	return n.fsm
+}
+
+// RenewLeaseLocal renews a lease without Raft consensus (leader-only operation).
+// This is safe because:
+// - Only called during heartbeats
+// - Validates leadership before execution
+// - If leader crashes, client re-establishes with new leader
+func (n *Node) RenewLeaseLocal(leaseID uint64) (time.Duration, error) {
+	if !n.IsLeader() {
+		return 0, fmt.Errorf("cannot renew lease locally: not leader")
+	}
+	return n.fsm.RenewLeaseLocal(leaseID)
+}
+
 // blocks until a leader is elected
 func (n *Node) WaitForLeader(timeout time.Duration) error {
 	ticker := time.NewTicker(100 * time.Millisecond)

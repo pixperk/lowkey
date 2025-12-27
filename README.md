@@ -484,6 +484,53 @@ go test ./... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
+## Benchmarking
+
+Measure lock performance under different scenarios:
+
+```bash
+# Contention: 10 clients competing for same lock
+make bench-contention
+
+# Parallel: 10 clients with unique locks (no contention)
+make bench-parallel
+
+# Sequential: Single client (baseline latency)
+make bench-sequential
+
+# Run all benchmarks
+make bench-all
+```
+
+**Custom benchmark parameters:**
+
+```bash
+go run examples/benchmark/main.go \
+  -mode=contention \
+  -clients=20 \
+  -duration=60s \
+  -hold=50ms \
+  -ttl=10s \
+  -server=localhost:9000
+```
+
+**Benchmark modes:**
+
+- `contention` - Multiple clients competing for the same lock (measures fairness and queue behavior)
+- `parallel` - Each client uses a unique lock (measures maximum throughput)
+- `sequential` - Single client acquiring repeatedly (measures baseline latency)
+
+**Metrics reported:**
+
+- **Throughput**: Successful lock acquisitions per second
+- **Latency**: Average, P50, P95, P99 lock acquisition times
+- **Success rate**: Percentage of successful vs failed attempts
+
+**Expected results** (single node, local network):
+- Sequential: ~100-500 ops/sec, <10ms latency
+- Parallel: ~1000-5000 ops/sec (scales with cores)
+- Contention: ~50-200 ops/sec (depends on hold duration)
+
 ---
 
 ## Resources

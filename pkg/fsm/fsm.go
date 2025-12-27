@@ -114,6 +114,25 @@ func (f *FSM) applyRenewLease(cmd types.RenewLeaseCmd) (any, error) {
 	}, nil
 }
 
+// RenewLeaseLocal renews a lease without going through Raft.
+// Only safe to call on the leader for heartbeat renewals.
+func (f *FSM) RenewLeaseLocal(leaseID uint64) (tm.Duration, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	lease, exists := f.leases[leaseID]
+	if !exists {
+		return 0, types.ErrLeaseNotFound
+	}
+
+	if lease.IsExpired(f.clock.Elapsed()) {
+		return 0, types.ErrLeaseExpired
+	}
+
+	lease.ExpiresAt = f.clock.ExpiresAt(lease.TTL)
+	return lease.TTL, nil
+}
+
 // returned when a lock is acquired
 type AcquireLockResponse struct {
 	FencingToken uint64

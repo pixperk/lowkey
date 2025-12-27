@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -72,6 +73,8 @@ func (c *Client) heartbeatLoop(ctx context.Context) {
 	ticker := time.NewTicker(c.leaseTTL / 3)
 	defer ticker.Stop()
 
+	var failureCount int
+
 	for {
 		select {
 		case <-ticker.C:
@@ -85,11 +88,27 @@ func (c *Client) heartbeatLoop(ctx context.Context) {
 			}
 
 			if err := stream.Send(&pb.HeartbeatRequest{LeaseId: leaseID}); err != nil {
+				failureCount++
+				log.Printf("[WARNING] Heartbeat send failed (attempt %d): %v", failureCount, err)
+				if failureCount >= 2 {
+					log.Printf("[CRITICAL] Lease %d may expire soon - heartbeat failing", leaseID)
+				}
 				continue
 			}
 
 			if _, err := stream.Recv(); err != nil {
+				failureCount++
+				log.Printf("[WARNING] Heartbeat recv failed (attempt %d): %v", failureCount, err)
+				if failureCount >= 2 {
+					log.Printf("[CRITICAL] Lease %d may expire soon - heartbeat failing", leaseID)
+				}
 				continue
+			}
+
+			// Reset failure count on success
+			if failureCount > 0 {
+				log.Printf("[INFO] Heartbeat recovered after %d failures", failureCount)
+				failureCount = 0
 			}
 
 		case <-c.stopCh:
