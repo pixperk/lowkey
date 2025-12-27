@@ -37,3 +37,18 @@ bench-all:
 # Percentile benchmarks (p50, p90, p99, p99.9)
 bench-percentiles:
 	go test -run=Percentile -v ./pkg/client/
+
+# Observability stack
+obs-up:
+	docker-compose up -d
+	@echo ""
+	@echo "✓ Prometheus running at http://localhost:9090"
+	@echo "✓ Grafana running at http://localhost:3000 (admin/admin)"
+	@echo ""
+	@echo "Next: Import grafana-dashboard.json via Grafana UI"
+
+obs-down:
+	docker-compose down
+
+obs-logs:
+	docker-compose logs -f

@@ -602,7 +602,58 @@ lowkey exposes Prometheus metrics at `/metrics` for monitoring lock performance,
 curl http://localhost:8080/metrics
 ```
 
-**Available metrics:**
+### Quick Start with Docker Compose
+
+Run Prometheus and Grafana alongside lowkey with a single command:
+
+**1. Start the observability stack:**
+```bash
+# using make (recommended)
+make obs-up
+
+# or using docker-compose directly
+docker-compose up -d
+```
+
+**2. Start lowkey:**
+```bash
+# in a separate terminal
+./lowkey --bootstrap --data-dir ./data
+```
+
+**3. Access dashboards:**
+- **Grafana**: http://localhost:3000 (login: `admin` / `admin`)
+- **Prometheus**: http://localhost:9090
+
+**4. Import lowkey dashboard:**
+
+In Grafana UI:
+1. Navigate to Dashboards → Import
+2. Click "Upload JSON file"
+3. Select `grafana-dashboard.json` from the lowkey directory
+4. Select "Prometheus" as the datasource
+5. Click "Import"
+
+The dashboard is now live with 12 panels tracking lock performance, cluster health, and system metrics.
+
+**What's included:**
+- **Prometheus** - Scrapes lowkey metrics every 5 seconds at `http://host.docker.internal:8080/metrics`
+- **Grafana** - Pre-configured with Prometheus datasource
+- **Dashboard JSON** - [grafana-dashboard.json](grafana-dashboard.json) ready to import
+- **Persistent storage** - Metrics and dashboards survive container restarts
+
+**Stop the stack:**
+```bash
+make obs-down
+# or: docker-compose down
+```
+
+**View logs:**
+```bash
+make obs-logs
+```
+
+### Available Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
@@ -643,15 +694,7 @@ rate(lowkey_lease_expire_total[5m])
 sum(lowkey_raft_is_leader)
 ```
 
-**Import pre-built Grafana dashboard:**
-
-```bash
-# import the dashboard JSON into Grafana
-curl -X POST http://grafana:3000/api/dashboards/db \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d @grafana-dashboard.json
-```
+### Grafana Dashboard
 
 The [grafana-dashboard.json](grafana-dashboard.json) includes:
 - **Lock latency percentiles** - p50, p90, p99, p99.9 tracking
