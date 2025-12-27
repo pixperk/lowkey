@@ -7,6 +7,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	pb "github.com/pixperk/lowkey/api/v1"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -26,15 +27,25 @@ func NewServer(httpAddr, grpcAddr string) *Server {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	mux := runtime.NewServeMux()
+	// grpc-gateway mux for gRPC → HTTP translation
+	grpcMux := runtime.NewServeMux()
 
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	err := pb.RegisterLockServiceHandlerFromEndpoint(ctx, mux, s.grpcAddr, opts)
+	err := pb.RegisterLockServiceHandlerFromEndpoint(ctx, grpcMux, s.grpcAddr, opts)
 	if err != nil {
 		return fmt.Errorf("failed to register gateway: %w", err)
 	}
 
-	s.httpServer.Handler = mux
+	// wrap grpcMux with standard http.ServeMux to add /metrics endpoint
+	rootMux := http.NewServeMux()
+
+	// prometheus metrics endpoint
+	rootMux.Handle("/metrics", promhttp.Handler())
+
+	// all other requests go to grpc-gateway
+	rootMux.Handle("/", grpcMux)
+
+	s.httpServer.Handler = rootMux
 
 	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("failed to start HTTP gateway: %w", err)

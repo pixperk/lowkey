@@ -6,6 +6,7 @@ import (
 
 	tm "time"
 
+	"github.com/pixperk/lowkey/pkg/metrics"
 	"github.com/pixperk/lowkey/pkg/time"
 	"github.com/pixperk/lowkey/pkg/types"
 )
@@ -83,6 +84,10 @@ func (f *FSM) applyCreateLease(cmd types.CreateLeaseCmd) (any, error) {
 
 	f.leases[leaseID] = lease
 
+	// metrics: track lease creation
+	metrics.LeaseCreateTotal.Inc()
+	metrics.LeasesActive.Set(float64(len(f.leases)))
+
 	return CreateLeaseResponse{
 		LeaseID:   leaseID,
 		ExpiresAt: expiresAt,
@@ -130,6 +135,10 @@ func (f *FSM) RenewLeaseLocal(leaseID uint64) (tm.Duration, error) {
 	}
 
 	lease.ExpiresAt = f.clock.ExpiresAt(lease.TTL)
+
+	// metrics: track lease renewal (heartbeat)
+	metrics.LeaseRenewTotal.Inc()
+
 	return lease.TTL, nil
 }
 
@@ -142,27 +151,33 @@ type AcquireLockResponse struct {
 func (f *FSM) applyAcquireLock(cmd types.AcquireLockCmd) (any, error) {
 	lease, exists := f.leases[cmd.LeaseID]
 	if !exists {
+		// metrics: track failure
+		metrics.LockAcquireTotal.WithLabelValues(cmd.LockName, "failure").Inc()
 		return nil, types.ErrLeaseNotFound
 	}
 
 	//if lease expired, cannot acquire lock
 	if lease.IsExpired(f.clock.Elapsed()) {
+		metrics.LockAcquireTotal.WithLabelValues(cmd.LockName, "failure").Inc()
 		return nil, types.ErrLeaseExpired
 	}
 
 	//verify lease owner matches lock owner
 	if lease.OwnerID != cmd.OwnerID {
+		metrics.LockAcquireTotal.WithLabelValues(cmd.LockName, "failure").Inc()
 		return nil, types.ErrNotLockOwner
 	}
 
 	if existingLock, held := f.locks[cmd.LockName]; held {
 		//if held by same lease, allow re-acquisition (idempotent)
 		if existingLock.LeaseID == cmd.LeaseID {
+			// not a failure, but also not a new acquisition
 			return AcquireLockResponse{
 				FencingToken: existingLock.FencingToken,
 			}, nil
 		}
 		//held by different lease, cannot acquire
+		metrics.LockAcquireTotal.WithLabelValues(cmd.LockName, "failure").Inc()
 		return nil, types.ErrLockAlreadyHeld
 	}
 
@@ -178,6 +193,10 @@ func (f *FSM) applyAcquireLock(cmd types.AcquireLockCmd) (any, error) {
 	}
 
 	f.locks[cmd.LockName] = lock
+
+	// metrics: track successful acquisition
+	metrics.LockAcquireTotal.WithLabelValues(cmd.LockName, "success").Inc()
+	metrics.LocksActive.Set(float64(len(f.locks)))
 
 	return AcquireLockResponse{
 		FencingToken: fencingToken,
@@ -203,6 +222,10 @@ func (f *FSM) applyReleaseLock(cmd types.ReleaseLockCmd) (any, error) {
 
 	delete(f.locks, cmd.LockName)
 
+	// metrics: track lock release
+	metrics.LockReleaseTotal.WithLabelValues(cmd.LockName).Inc()
+	metrics.LocksActive.Set(float64(len(f.locks)))
+
 	return ReleaseLockResponse{
 		Released: true,
 	}, nil
@@ -225,11 +248,18 @@ func (f *FSM) applyExpireLease(cmd types.ExpireLeaseCmd) (any, error) {
 		if lock.LeaseID == lease.LeaseID {
 			delete(f.locks, lockName)
 			locksReleased++
+			// metrics: track auto-release of lock due to lease expiration
+			metrics.LockReleaseTotal.WithLabelValues(lockName).Inc()
 		}
 	}
 
 	//delete the lease
 	delete(f.leases, lease.LeaseID)
+
+	// metrics: track lease expiration and update gauges
+	metrics.LeaseExpireTotal.Inc()
+	metrics.LeasesActive.Set(float64(len(f.leases)))
+	metrics.LocksActive.Set(float64(len(f.locks)))
 
 	return ExpireLeaseResponse{
 		LocksReleased: locksReleased,

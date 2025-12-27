@@ -591,6 +591,67 @@ make test-coverage
 
 ---
 
+## Observability
+
+### Prometheus Metrics
+
+lowkey exposes Prometheus metrics at `/metrics` for monitoring lock performance, cluster health, and resource usage.
+
+**Access metrics:**
+```bash
+curl http://localhost:8080/metrics
+```
+
+**Available metrics:**
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `lowkey_lock_acquire_duration_seconds` | Histogram | `lock_name` | Time taken to acquire a lock (p50/p90/p99) |
+| `lowkey_lock_acquire_total` | Counter | `lock_name`, `status` | Total lock acquisitions (success/failure) |
+| `lowkey_lock_release_total` | Counter | `lock_name` | Total lock releases |
+| `lowkey_locks_active` | Gauge | - | Currently held locks |
+| `lowkey_lease_create_total` | Counter | - | Total leases created |
+| `lowkey_lease_renew_total` | Counter | - | Total lease renewals (heartbeats) |
+| `lowkey_lease_expire_total` | Counter | - | Total lease expirations (client failures) |
+| `lowkey_leases_active` | Gauge | - | Currently active leases (connected clients) |
+| `lowkey_heartbeat_total` | Counter | `status` | Heartbeat success/failure count |
+| `lowkey_raft_is_leader` | Gauge | - | Whether this node is leader (1) or follower (0) |
+| `lowkey_raft_peers` | Gauge | - | Number of peers in cluster |
+| `lowkey_raft_applied_index` | Gauge | - | Last Raft log index applied to FSM |
+| `lowkey_up` | Gauge | - | Service uptime (always 1 when running) |
+
+**Example Prometheus queries:**
+
+```promql
+# lock acquisition success rate
+sum(rate(lowkey_lock_acquire_total{status="success"}[5m]))
+/
+sum(rate(lowkey_lock_acquire_total[5m]))
+
+# p99 lock latency
+histogram_quantile(0.99,
+  rate(lowkey_lock_acquire_duration_seconds_bucket[5m])
+)
+
+# active locks per lock name
+sum by (lock_name) (lowkey_locks_active)
+
+# lease expiration rate (client failures)
+rate(lowkey_lease_expire_total[5m])
+
+# cluster health: leader count (should always be 1)
+sum(lowkey_raft_is_leader)
+```
+
+**Example Grafana dashboard:**
+- Track lock latency percentiles (p50, p90, p99, p99.9)
+- Monitor lock acquisition success rate
+- Alert on lease expiration spikes (client crashes)
+- Track cluster size and leader changes
+- Visualize lock contention by lock name
+
+---
+
 ## Technical Details
 
 ### Core Components
