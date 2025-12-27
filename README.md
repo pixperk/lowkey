@@ -18,6 +18,7 @@
 ## Architecture
 
 ```mermaid
+%%{init: {'theme':'dark'}}%%
 graph TB
     subgraph Clients
         C1[Client A<br/>Python]
@@ -58,61 +59,45 @@ graph TB
     C2 -->|gRPC| G2
     C3 -->|HTTP| H1
 
-    style R1 fill:#90EE90
-    style R2 fill:#FFB6C1
-    style R3 fill:#FFB6C1
+    style R1 fill:#4a9eff
+    style R2 fill:#667
+    style R3 fill:#667
 ```
 
 ---
 
 ## Quick Start
 
-### Installation
-
 ```bash
+# Clone and build
 git clone https://github.com/pixperk/lowkey.git
 cd lowkey
 go build -o lowkey cmd/lowkey/main.go
-```
 
-### Start a Single Node
-
-```bash
+# Start single node
 ./lowkey --bootstrap --data-dir ./data
-```
 
-### Use the HTTP API
-
-```bash
-# Create a lease (client heartbeat)
+# Create lease
 curl -X POST http://localhost:8080/v1/lease \
-  -H "Content-Type: application/json" \
-  -d '{"owner_id":"client-1","ttl_seconds":10}'
-# Response: {"leaseId":"1","ttlSeconds":"10"}
+  -d '{"owner_id":"client-1","ttl_seconds":60}'
 
-# Acquire a lock
+# Acquire lock (get fencing token)
 curl -X POST http://localhost:8080/v1/lock/acquire \
-  -H "Content-Type: application/json" \
   -d '{"lock_name":"my-job","owner_id":"client-1","lease_id":1}'
-# Response: {"fencingToken":"1","leaseTtlSeconds":"10"}
 
-# Use the fencing token to protect critical operations
-# (Your application must validate tokens!)
-
-# Release the lock
+# Release lock
 curl -X POST http://localhost:8080/v1/lock/release \
-  -H "Content-Type: application/json" \
   -d '{"lock_name":"my-job","lease_id":1}'
-# Response: {"released":true}
 ```
 
 ---
 
-## Core Concepts
+## How It Works
 
 ### Lock Lifecycle
 
 ```mermaid
+%%{init: {'theme':'dark'}}%%
 sequenceDiagram
     participant C as Client
     participant L as lowkey
@@ -142,20 +127,20 @@ sequenceDiagram
 ### Fencing Tokens Prevent Stale Writes
 
 ```mermaid
+%%{init: {'theme':'dark'}}%%
 sequenceDiagram
     participant A as Client A<br/>(paused)
     participant B as Client B
     participant L as lowkey
     participant R as Protected Resource
 
-    Note over A: Acquires lock
     A->>L: AcquireLock("db-backup")
     L->>A: fencing_token=100
 
-    Note over A: GC pause (20 seconds)
-    rect rgb(255, 200, 200)
+    Note over A: GC pause (20s)
+    rect rgb(80, 40, 40)
         Note over A,L: Lease expires!
-        L->>L: Expire lease, release lock
+        L->>L: Release lock
     end
 
     B->>L: AcquireLock("db-backup")
@@ -169,8 +154,6 @@ sequenceDiagram
     A->>R: Write(data, token=100)
     R->>R: 100 < 101 (stale!)
     R->>A: Rejected
-
-    Note over R: Data corruption prevented!
 ```
 
 **Key insight:** The fencing token ensures even if a client holds a stale lock, the protected resource will reject its operations.
@@ -181,29 +164,15 @@ sequenceDiagram
 
 ### HTTP REST API
 
-#### Lease Operations
-
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/v1/lease` | POST | Create a new lease |
-| `/v1/lease/renew` | POST | Renew an existing lease |
-
-#### Lock Operations
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
+| `/v1/lease/renew` | POST | Renew an existing lease (polling) |
 | `/v1/lock/acquire` | POST | Acquire a lock (returns fencing token) |
 | `/v1/lock/release` | POST | Release a lock |
-
-#### Cluster Status
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
 | `/v1/status` | GET | Get cluster status and statistics |
 
 ### gRPC API
-
-For high-performance clients, use the gRPC API with bidirectional streaming for efficient lease renewal:
 
 ```protobuf
 service LockService {
@@ -216,87 +185,11 @@ service LockService {
 }
 ```
 
----
-
-## Usage Patterns
-
-### Pattern 1: Singleton Job
-
-Ensure only one instance of a job runs across your cluster:
-
-```bash
-# Instance 1
-LEASE=$(curl -s -X POST http://localhost:8080/v1/lease \
-  -d '{"owner_id":"worker-1","ttl_seconds":60}' | jq -r .leaseId)
-
-LOCK=$(curl -s -X POST http://localhost:8080/v1/lock/acquire \
-  -d "{\"lock_name\":\"daily-report\",\"owner_id\":\"worker-1\",\"lease_id\":$LEASE}")
-
-if [ $? -eq 0 ]; then
-    TOKEN=$(echo $LOCK | jq -r .fencingToken)
-    echo "Running job with token $TOKEN"
-    # Run your job here
-    ./run-daily-report.sh --token $TOKEN
-fi
-```
-
-### Pattern 2: Leader Election
-
-```bash
-# Each instance tries to acquire the "leader" lock
-# Only one succeeds and becomes the leader
-curl -X POST http://localhost:8080/v1/lock/acquire \
-  -d '{"lock_name":"leader","owner_id":"'$(hostname)'","lease_id":'$LEASE_ID'}'
-```
-
----
-
-## Design Philosophy
-
-### Why Raft?
-
-- **Strong consistency** - No split-brain scenarios
-- **Proven algorithm** - Well-understood failure modes
-- **Leader-based** - Simple to reason about
-- **Log replication** - Durable state machine
-
-### Why NOT Redis Redlock?
-
-Martin Kleppmann [explained it best](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html):
-
-> "Redlock depends on timing assumptions... even if your clock is perfectly synchronized, the moment you cross a network boundary, all guarantees are off."
-
-**lowkey uses:**
-- Monotonic time (not wall clocks)
-- Fencing tokens (not timeouts)
-- Consensus (not independent nodes)
-
-### Why Fencing Tokens?
-
-```mermaid
-flowchart LR
-    A[Client acquires lock] --> B[Gets fencing token N]
-    B --> C[Client pauses]
-    C --> D[Lease expires]
-    D --> E[Lock released]
-    E --> F[Other client gets token N+1]
-    F --> G[First client wakes up]
-    G --> H{Resource checks token}
-    H -->|Token N < N+1| I[Reject stale write]
-    H -->|Token N+1| J[Accept current write]
-
-    style I fill:#ffcccc
-    style J fill:#ccffcc
-```
-
-**Without fencing tokens:** Timeouts alone can't prevent stale writes
-**With fencing tokens:** Resources can detect and reject stale operations
+**Note:** HTTP clients poll `/v1/lease/renew`, gRPC clients use `Heartbeat` stream for efficiency.
 
 ---
 
 ## Configuration
-
-### Command-line Flags
 
 ```bash
 ./lowkey \
@@ -319,32 +212,70 @@ flowchart LR
 
 ---
 
-## Running Tests
+## Why lowkey?
 
-```bash
-# Unit tests
-go test ./pkg/... -v
+### Why Raft?
 
-# Integration tests
-go test ./test/integration/... -v
+- **Strong consistency** - No split-brain scenarios
+- **Proven algorithm** - Well-understood failure modes
+- **Leader-based** - Simple to reason about
 
-# Coverage
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
+### Why NOT Redis Redlock?
+
+Martin Kleppmann [explained it best](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html):
+
+> "Redlock depends on timing assumptions... even if your clock is perfectly synchronized, the moment you cross a network boundary, all guarantees are off."
+
+**lowkey uses:**
+- Monotonic time (not wall clocks)
+- Fencing tokens (not timeouts)
+- Consensus (not independent nodes)
+
+### Why Fencing Tokens?
+
+```mermaid
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    A[Client acquires lock] --> B[Gets fencing token N]
+    B --> C[Client pauses]
+    C --> D[Lease expires]
+    D --> E[Lock released]
+    E --> F[Other client gets token N+1]
+    F --> G[First client wakes up]
+    G --> H{Resource checks token}
+    H -->|N < N+1| I[Reject stale]
+    H -->|N+1| J[Accept current]
+
+    style I fill:#a44
+    style J fill:#4a4
 ```
+
+**Without fencing tokens:** Timeouts alone can't prevent stale writes
+**With fencing tokens:** Resources can detect and reject stale operations
 
 ---
 
 ## Comparison
 
-| Feature | lowkey | etcd | Consul | Redis Redlock | ZooKeeper |
-|---------|--------|------|--------|---------------|-----------|
-| Consensus | Raft | Raft | Raft | None | ZAB (Paxos-like) |
-| Fencing Tokens | Yes | Yes | No | No | Yes (via versions) |
-| Lease-based | Yes | Yes | Yes | No | Yes (sessions) |
-| HTTP API | Yes | Yes | Yes | No | No |
-| gRPC API | Yes | Yes | Yes | No | No |
-| Focus | Locks only | KV store + locks | Service discovery | Cache | Coordination |
+| Feature | lowkey | etcd | Consul | Redis Redlock |
+|---------|--------|------|--------|---------------|
+| Consensus | Raft | Raft | Raft | None |
+| Fencing Tokens | Yes | Yes | No | No |
+| HTTP + gRPC | Yes | Yes | Yes | No |
+| Focus | Locks only | KV + locks | Service mesh | Cache |
+
+---
+
+## Testing
+
+```bash
+# Unit tests
+go test ./pkg/... -v
+
+# Coverage
+go test ./... -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
 
 ---
 
@@ -357,29 +288,11 @@ go tool cover -html=coverage.out
 
 ---
 
-## Contributing
+## Built With
 
-Contributions welcome! Please read the contributing guidelines first.
-
----
-
-## License
-
-MIT License - see LICENSE file for details
-
----
-
-## Acknowledgments
-
-Built with:
 - [hashicorp/raft](https://github.com/hashicorp/raft) - Raft consensus implementation
 - [grpc-ecosystem/grpc-gateway](https://github.com/grpc-ecosystem/grpc-gateway) - HTTP/gRPC translation
 - [bbolt](https://github.com/etcd-io/bbolt) - Persistent storage
-
-Inspired by:
-- Google Chubby
-- etcd
-- Apache ZooKeeper
 
 ---
 
