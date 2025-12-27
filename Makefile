@@ -33,3 +33,7 @@ bench-contention:
 
 bench-all:
 	go test -bench=. -benchtime=10s ./pkg/client/
+
+# Percentile benchmarks (p50, p90, p99, p99.9)
+bench-percentiles:
+	go test -run=Percentile -v ./pkg/client/

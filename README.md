@@ -544,16 +544,19 @@ service LockService {
 Using Go's built-in benchmark framework:
 
 ```bash
-# Run all benchmarks
+# Throughput benchmarks
 make bench-all
 
-# Individual benchmarks
+# Individual scenarios
 make bench-sequential   # Single client baseline
 make bench-parallel     # Multiple clients, unique locks
 make bench-contention   # Multiple clients competing
+
+# Latency percentiles (p50, p90, p99, p99.9)
+make bench-percentiles
 ```
 
-**Results** (AMD Ryzen 7 5800HS, 16 cores):
+**Throughput Results** (AMD Ryzen 7 5800HS, 16 cores):
 
 | Benchmark | Operations | Latency/op | Scenario |
 |-----------|-----------|------------|----------|
@@ -561,11 +564,20 @@ make bench-contention   # Multiple clients competing
 | Parallel | 19,911 | 0.60ms | Multiple clients, unique locks (true throughput) |
 | Contention | 10,000 | 1.40ms | Multiple clients competing for same lock |
 
+**Latency Percentiles** (1000 samples each):
+
+| Scenario | p50 | p90 | p99 | p99.9 |
+|----------|-----|-----|-----|-------|
+| Sequential | 2.5ms | 2.7ms | 3.1ms | 6.5ms |
+| Parallel | 4.4ms | 5.5ms | 7.0ms | 25ms |
+| Contention | 5.5ms | 6.5ms | 7.6ms | 7.6ms |
+
 **Key insights:**
+- **Consistent latency** - p99 is only ~2ms slower than p50 (no wild outliers)
+- **Sub-10ms p99** - 99% of locks acquired in under 10ms even with contention
 - Heartbeats bypass Raft (leader-only renewal) → minimal overhead
 - Lock acquire/release through Raft → strong consistency
 - Parallel throughput 5.4x faster than sequential
-- Sub-5ms latency for distributed consensus operations
 
 ### Testing
 
