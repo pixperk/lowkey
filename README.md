@@ -643,12 +643,29 @@ rate(lowkey_lease_expire_total[5m])
 sum(lowkey_raft_is_leader)
 ```
 
-**Example Grafana dashboard:**
-- Track lock latency percentiles (p50, p90, p99, p99.9)
-- Monitor lock acquisition success rate
-- Alert on lease expiration spikes (client crashes)
-- Track cluster size and leader changes
-- Visualize lock contention by lock name
+**Import pre-built Grafana dashboard:**
+
+```bash
+# import the dashboard JSON into Grafana
+curl -X POST http://grafana:3000/api/dashboards/db \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d @grafana-dashboard.json
+```
+
+The [grafana-dashboard.json](grafana-dashboard.json) includes:
+- **Lock latency percentiles** - p50, p90, p99, p99.9 tracking
+- **Success rate monitoring** - Lock acquisition and heartbeat success %
+- **Active resource gauges** - Currently held locks and active leases
+- **Failure detection** - Lease expiration rate (client crashes) with alerts
+- **Operations throughput** - Lock acquire/release rates
+- **Raft cluster health** - Leader election status, cluster size, replication lag
+- **Lock contention analysis** - Per-lock-name request rates
+
+**Metric collection:**
+- Raft health metrics update every 5 seconds
+- FSM metrics update in real-time on each operation
+- All metrics scraped by Prometheus (default `/metrics` endpoint)
 
 ---
 

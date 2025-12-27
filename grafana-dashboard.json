@@ -1,0 +1,297 @@
+{
+  "dashboard": {
+    "title": "lowkey - Distributed Locks",
+    "tags": ["lowkey", "distributed-locks", "raft"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Lock Acquisition Latency (p50, p90, p99)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(lowkey_lock_acquire_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.90, rate(lowkey_lock_acquire_duration_seconds_bucket[5m]))",
+            "legendFormat": "p90",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(lowkey_lock_acquire_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          },
+          {
+            "expr": "histogram_quantile(0.999, rate(lowkey_lock_acquire_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99.9",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Latency"},
+          {"format": "short"}
+        ],
+        "legend": {"show": true},
+        "tooltip": {"shared": true}
+      },
+      {
+        "id": 2,
+        "title": "Lock Acquisition Success Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(lowkey_lock_acquire_total{status=\"success\"}[5m])) / sum(rate(lowkey_lock_acquire_total[5m])) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Success Rate", "max": 100, "min": 0},
+          {"format": "short"}
+        ],
+        "legend": {"show": true},
+        "tooltip": {"shared": true},
+        "thresholds": [
+          {"value": 95, "colorMode": "critical", "op": "lt", "fill": true, "line": true}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Active Locks",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "lowkey_locks_active",
+            "legendFormat": "Total Active Locks",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Count"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Active Leases (Connected Clients)",
+        "type": "graph",
+        "gridPos": {"x": 8, "y": 8, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "lowkey_leases_active",
+            "legendFormat": "Active Leases",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Count"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Lease Expiration Rate (Client Failures)",
+        "type": "graph",
+        "gridPos": {"x": 16, "y": 8, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(lowkey_lease_expire_total[5m])",
+            "legendFormat": "Expiration Rate",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Expirations/sec"},
+          {"format": "short"}
+        ],
+        "alert": {
+          "name": "High Lease Expiration Rate",
+          "message": "Lease expiration rate is high - clients may be crashing",
+          "conditions": [
+            {
+              "evaluator": {"params": [5], "type": "gt"},
+              "query": {"params": ["A", "5m", "now"]},
+              "type": "query"
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Lock Operations Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(lowkey_lock_acquire_total{status=\"success\"}[5m]))",
+            "legendFormat": "Acquisitions (success)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(lowkey_lock_acquire_total{status=\"failure\"}[5m]))",
+            "legendFormat": "Acquisitions (failure)",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(lowkey_lock_release_total[5m]))",
+            "legendFormat": "Releases",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Operations/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Heartbeat Success Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(lowkey_heartbeat_total{status=\"success\"}[5m])) / sum(rate(lowkey_heartbeat_total[5m])) * 100",
+            "legendFormat": "Heartbeat Success %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Success Rate", "max": 100, "min": 0},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Raft Cluster Health",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 24, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(lowkey_raft_is_leader)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"},
+                {"value": 2, "color": "red"}
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "pluginVersion": "9.0.0"
+      },
+      {
+        "id": 9,
+        "title": "Cluster Size",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 24, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "lowkey_raft_peers",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Raft Applied Index (Replication Progress)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "lowkey_raft_applied_index",
+            "legendFormat": "Applied Index",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Index"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Lock Contention by Lock Name",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (lock_name) (rate(lowkey_lock_acquire_total[5m]))",
+            "legendFormat": "{{lock_name}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "legend": {"show": true, "alignAsTable": true, "rightSide": true}
+      },
+      {
+        "id": 12,
+        "title": "Lease Operations Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(lowkey_lease_create_total[5m])",
+            "legendFormat": "Creates",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(lowkey_lease_renew_total[5m])",
+            "legendFormat": "Renewals (Heartbeats)",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(lowkey_lease_expire_total[5m])",
+            "legendFormat": "Expirations",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Operations/sec"},
+          {"format": "short"}
+        ]
+      }
+    ],
+    "time": {"from": "now-1h", "to": "now"},
+    "timepicker": {},
+    "templating": {"list": []},
+    "annotations": {"list": []},
+    "uid": "lowkey-dashboard",
+    "description": "Comprehensive monitoring dashboard for lowkey distributed lock service"
+  },
+  "overwrite": true
+}
