@@ -92,6 +92,77 @@ curl -X POST http://localhost:8080/v1/lock/release \
 
 ---
 
+## Go SDK
+
+### Quick Start
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "github.com/pixperk/lowkey/pkg/client"
+)
+
+func main() {
+    // Create client
+    c, err := client.NewClient("localhost:9000", "worker-1")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer c.Stop()
+
+    // Start lease (automatically renews every TTL/3)
+    ctx := context.Background()
+    if err := c.Start(ctx, 10*time.Second); err != nil {
+        log.Fatal(err)
+    }
+
+    // Acquire lock
+    lock, err := c.Acquire(ctx, "my-job")
+    if err != nil {
+        log.Printf("Lock held by another instance: %v", err)
+        return
+    }
+    defer lock.Release(ctx)
+
+    // Get fencing token for protected operations
+    token := lock.Token()
+    log.Printf("Acquired lock with fencing token %d", token)
+
+    // Do work with the lock held
+    performCriticalOperation(token)
+}
+```
+
+### SDK Reference
+
+**Client Methods:**
+
+- `NewClient(addr, ownerID string) (*Client, error)` - Create client connection
+- `Start(ctx, ttl) error` - Create lease with automatic heartbeat renewal (every TTL/3)
+- `Acquire(ctx, lockName) (*Lock, error)` - Acquire distributed lock, returns fencing token
+- `Release(ctx, lockName) error` - Release lock explicitly
+- `Status(ctx) (*GetStatusResponse, error)` - Get cluster status
+- `Stop() error` - Stop heartbeat and close connection
+
+**Lock Methods:**
+
+- `Token() uint64` - Get fencing token for protected resource operations
+- `Release(ctx) error` - Release the lock
+
+**Behavior:**
+
+- Automatic heartbeats every TTL/3 via gRPC streaming
+- Thread-safe for concurrent use
+- Locks auto-release on lease expiration
+- Uses bidirectional streaming (gRPC only, not HTTP)
+
+---
+
 ## How It Works
 
 ### Lock Lifecycle
@@ -186,6 +257,142 @@ service LockService {
 ```
 
 **Note:** HTTP clients poll `/v1/lease/renew`, gRPC clients use `Heartbeat` stream for efficiency.
+
+---
+
+## Production Examples
+
+### Using Fencing Tokens with Redis
+
+Protect Redis operations by storing the fencing token alongside your data:
+
+```go
+import (
+    "context"
+    "fmt"
+    "github.com/pixperk/lowkey/pkg/client"
+    "github.com/redis/go-redis/v9"
+)
+
+func processJob(ctx context.Context, lockClient *client.Client, redisClient *redis.Client) error {
+    // Acquire lock
+    lock, err := lockClient.Acquire(ctx, "daily-report")
+    if err != nil {
+        return fmt.Errorf("lock held by another instance: %w", err)
+    }
+    defer lock.Release(ctx)
+
+    token := lock.Token()
+
+    // Check if we have a stale token
+    storedToken, _ := redisClient.Get(ctx, "daily-report:token").Uint64()
+    if token < storedToken {
+        return fmt.Errorf("stale token %d < %d, aborting", token, storedToken)
+    }
+
+    // Perform protected operation with token validation
+    pipe := redisClient.TxPipeline()
+    pipe.Set(ctx, "daily-report:token", token, 0)
+    pipe.Set(ctx, "daily-report:data", "report-content", 0)
+
+    _, err = pipe.Exec(ctx)
+    return err
+}
+```
+
+**Key insight:** Even if a paused client wakes up with an expired lock, Redis will reject the write because `token < storedToken`.
+
+### Using Fencing Tokens with Postgres
+
+Store the fencing token in a dedicated column and use conditional updates:
+
+```sql
+CREATE TABLE jobs (
+    name TEXT PRIMARY KEY,
+    last_run TIMESTAMP,
+    last_token BIGINT NOT NULL DEFAULT 0
+);
+```
+
+```go
+import (
+    "context"
+    "database/sql"
+    "github.com/pixperk/lowkey/pkg/client"
+)
+
+func runDatabaseJob(ctx context.Context, lockClient *client.Client, db *sql.DB) error {
+    lock, err := lockClient.Acquire(ctx, "db-migration")
+    if err != nil {
+        return err
+    }
+    defer lock.Release(ctx)
+
+    token := lock.Token()
+
+    // Conditional update: only succeed if our token is newer
+    result, err := db.ExecContext(ctx, `
+        UPDATE jobs
+        SET last_run = NOW(), last_token = $1
+        WHERE name = $2 AND last_token < $1
+    `, token, "db-migration")
+
+    if err != nil {
+        return err
+    }
+
+    rows, _ := result.RowsAffected()
+    if rows == 0 {
+        return fmt.Errorf("stale token, another instance already ran")
+    }
+
+    // Safe to proceed - we have the freshest token
+    return runMigration(ctx, db)
+}
+```
+
+### Using Fencing Tokens with S3
+
+Prevent split-brain writes to object storage:
+
+```go
+func uploadWithToken(ctx context.Context, lockClient *client.Client, s3Client *s3.Client) error {
+    lock, err := lockClient.Acquire(ctx, "backup-upload")
+    if err != nil {
+        return err
+    }
+    defer lock.Release(ctx)
+
+    token := lock.Token()
+
+    // First, check the current token in metadata
+    head, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+        Bucket: aws.String("backups"),
+        Key:    aws.String("latest.tar.gz"),
+    })
+
+    if err == nil {
+        storedToken, _ := strconv.ParseUint(head.Metadata["Fencing-Token"], 10, 64)
+        if token <= storedToken {
+            return fmt.Errorf("stale token, aborting upload")
+        }
+    }
+
+    // Upload with token in metadata
+    _, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
+        Bucket: aws.String("backups"),
+        Key:    aws.String("latest.tar.gz"),
+        Body:   data,
+        Metadata: map[string]string{
+            "Fencing-Token": fmt.Sprintf("%d", token),
+        },
+    })
+
+    return err
+}
+```
+
+**Pattern:** Always include the fencing token with your write operations. The protected resource validates `new_token > stored_token` before accepting writes.
 
 ---
 
