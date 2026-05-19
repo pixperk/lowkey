@@ -4,13 +4,9 @@
 
 **Distributed locking with Raft consensus and fencing tokens**
 
-[![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Raft](https://img.shields.io/badge/consensus-Raft-orange.svg)](https://raft.github.io/)
-
 *Strong consistency for distributed mutual exclusion*
 
-[Quick Start](#quick-start) • [Go SDK](#go-sdk) • [Examples](#production-examples) • [API](#api-reference)
+[Quick Start](#quick-start) · [Go SDK](#go-sdk) · [Examples](#production-examples) · [API](#api-reference)
 
 </div>
 
@@ -20,6 +16,12 @@
 
 **lowkey** is a distributed lock service built on Raft consensus. It provides strongly consistent locks with fencing tokens to prevent split-brain scenarios and stale writes.
 
+lowkey is layered: client SDK on top, gRPC + HTTP gateway in the middle, HashiCorp Raft underneath, and the lock/lease FSM at the bottom. Lease renewals take a fast path on the leader (no Raft round-trip); only lock acquire/release go through consensus.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pixperk/lowkey/main/assets/architecture.png" alt="lowkey architecture: 4 layers - Client SDK, Server (gRPC + HTTP), Raft Consensus, FSM state" width="700">
+</p>
+
 **Use cases:**
 - Distributed cron jobs (only one instance executes)
 - Database migrations (ensure single execution)
@@ -27,35 +29,40 @@
 - Critical section protection across multiple processes
 
 **Core guarantees:**
-- **Strong consistency** - CP in CAP theorem, no split-brain under network partitions
-- **Fencing tokens** - Monotonically increasing counters prevent stale writes
-- **Automatic cleanup** - Lease-based locks release automatically on client failure
+- **Strong consistency**, CP in CAP, no split-brain under network partitions
+- **Fencing tokens**, monotonically increasing counters that prevent stale writes
+- **Automatic cleanup**, lease-based locks release automatically on client failure
 
 ---
 
 ## Why lowkey?
 
-**The problem with naive locking:**
+**The problem with naive locking.** Multiple service instances need to coordinate. You add a distributed lock. But:
+- Networks partition, so multiple "leaders" appear
+- Processes pause (GC, CPU), so stale lock holders exist
+- Clients crash, so locks are held forever
 
-Multiple service instances need to coordinate. You add a distributed lock. But:
-- Networks partition → multiple "leaders"
-- Processes pause (GC, CPU) → stale lock holders
-- Clients crash → locks held forever
-
-**How lowkey solves it:**
-
-1. **Raft consensus** → Only majority partition can acquire locks
-2. **Fencing tokens** → Resources reject operations from stale lock holders
-3. **Leases** → Locks auto-release when clients stop heartbeating
+**How lowkey solves it.**
+1. **Raft consensus**: only the majority partition can acquire locks
+2. **Fencing tokens**: resources reject operations from stale lock holders
+3. **Leases**: locks auto-release when clients stop heartbeating
 
 **Comparison with alternatives:**
 
 | System | Consensus | Fencing Tokens | Split-brain Protection |
-|--------|-----------|----------------|----------------------|
-| **lowkey** | Raft | ✓ | ✓ |
-| etcd | Raft | ✓ | ✓ |
-| Consul | Raft | ✗ | ✓ |
-| Redis Redlock | None | ✗ | ✗ |
+|--------|-----------|----------------|------------------------|
+| **lowkey** | Raft | yes | yes |
+| etcd | Raft | yes | yes |
+| Consul | Raft | no | yes |
+| Redis Redlock | none | no | no |
+
+### Consistency under partition
+
+lowkey is CP: when the cluster splits, only the majority side keeps serving writes. The minority side rejects acquire/release until it rejoins. No two clients can ever hold the same lock with the same fencing token.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pixperk/lowkey/main/assets/cp.png" alt="CP under partition: minority side stops serving writes; majority retains the lock authority" width="600">
+</p>
 
 ---
 
@@ -66,14 +73,14 @@ Multiple service instances need to coordinate. You add a distributed lock. But:
 ```bash
 git clone https://github.com/pixperk/lowkey.git
 cd lowkey
-go build -o lowkey cmd/lowkey/main.go
+make build              # produces ./bin/lowkey
+# or: go install ./cmd/lowkey
 ```
 
 ### Single Node (Development)
 
 ```bash
-# Start server
-./lowkey --bootstrap --data-dir ./data
+./bin/lowkey --bootstrap --data-dir ./data
 
 # Server running on:
 # - gRPC: :9000
@@ -122,7 +129,6 @@ import (
 )
 
 func main() {
-    // Connect to lowkey
     c, err := client.NewClient("localhost:9000", "worker-1")
     if err != nil {
         log.Fatal(err)
@@ -196,7 +202,6 @@ import (
 )
 
 func processJob(ctx context.Context, lockClient *client.Client, redisClient *redis.Client) error {
-    // Acquire lock
     lock, err := lockClient.Acquire(ctx, "daily-report")
     if err != nil {
         return fmt.Errorf("lock held by another instance: %w", err)
@@ -322,17 +327,19 @@ func uploadWithToken(ctx context.Context, lockClient *client.Client, s3Client *s
 ### Single Node (Development)
 
 ```bash
-./lowkey --bootstrap --data-dir ./data
+./bin/lowkey --bootstrap --data-dir ./data
 ```
 
 ### Multi-Node Cluster
 
-**Node 1 (Bootstrap):**
+The first node bootstraps; the rest join via the bootstrap node's **gRPC** address. `--join` accepts a comma-separated seed list. The joiner walks the list and skips any seed that responds *NotLeader*, so listing several known members makes the join robust to which node is currently leader.
+
+**Node 1 (bootstrap):**
 ```bash
-./lowkey \
-  --node-id node-1 \
+./bin/lowkey \
+  --node-id <uuid-1> \
   --raft-addr 10.0.1.1:7000 \
-  --grpc-addr :9000 \
+  --grpc-addr 10.0.1.1:9000 \
   --http-addr :8080 \
   --data-dir /var/lib/lowkey \
   --bootstrap
@@ -340,24 +347,24 @@ func uploadWithToken(ctx context.Context, lockClient *client.Client, s3Client *s
 
 **Node 2:**
 ```bash
-./lowkey \
-  --node-id node-2 \
+./bin/lowkey \
+  --node-id <uuid-2> \
   --raft-addr 10.0.1.2:7000 \
-  --grpc-addr :9000 \
+  --grpc-addr 10.0.1.2:9000 \
   --http-addr :8080 \
   --data-dir /var/lib/lowkey \
-  --join 10.0.1.1:7000
+  --join 10.0.1.1:9000
 ```
 
-**Node 3:**
+**Node 3 (multiple seeds for robustness):**
 ```bash
-./lowkey \
-  --node-id node-3 \
+./bin/lowkey \
+  --node-id <uuid-3> \
   --raft-addr 10.0.1.3:7000 \
-  --grpc-addr :9000 \
+  --grpc-addr 10.0.1.3:9000 \
   --http-addr :8080 \
   --data-dir /var/lib/lowkey \
-  --join 10.0.1.1:7000
+  --join 10.0.1.1:9000,10.0.1.2:9000
 ```
 
 ### Configuration Flags
@@ -370,7 +377,9 @@ func uploadWithToken(ctx context.Context, lockClient *client.Client, s3Client *s
 | `--http-addr` | `:8080` | HTTP gateway listen address |
 | `--data-dir` | `./data` | Data directory for Raft logs and snapshots |
 | `--bootstrap` | `false` | Bootstrap a new cluster (first node only) |
-| `--join` | `""` | Join existing cluster (address of any existing node) |
+| `--join` | `""` | Comma-separated gRPC seed addresses to join an existing cluster |
+
+`--bootstrap` and `--join` are mutually exclusive.
 
 ### Cluster Operations
 
@@ -379,132 +388,43 @@ func uploadWithToken(ctx context.Context, lockClient *client.Client, s3Client *s
 curl http://localhost:8080/v1/status
 ```
 
-**Response:**
 ```json
 {
-  "node_id": "node-1",
+  "node_id": "9261ae0a-00cf-4463-9a55-445dba193fdf",
   "is_leader": true,
-  "leader_addr": "10.0.1.1:7000",
-  "cluster_size": 3
+  "leader_address": "10.0.1.1:7000",
+  "cluster_size": 3,
+  "state": "leader",
+  "stats": { "leases": 4, "locks": 2, "fencing_counter": 137 }
 }
 ```
+
+**Add a peer manually** (used by `--join` under the hood):
+```bash
+curl -X POST http://localhost:8080/v1/cluster/peers \
+  -d '{"node_id":"<uuid>","raft_address":"10.0.1.4:7000"}'
+```
+
+**Remove a peer:**
+```bash
+curl -X DELETE http://localhost:8080/v1/cluster/peers/<uuid>
+```
+
+Membership RPCs are leader-only; non-leaders return `NotLeader` (gRPC `Unavailable`) with the current leader's address.
 
 ---
 
 ## How It Works
 
-### Lock Lifecycle
-
-```mermaid
-%%{init: {'theme':'dark'}}%%
-sequenceDiagram
-    participant C as Client
-    participant L as lowkey
-    participant R as Protected Resource
-
-    C->>L: CreateLease(ttl=10s)
-    L->>C: lease_id=1
-
-    Note over C,L: Keep lease alive
-    loop Every 3 seconds
-        C->>L: RenewLease(lease_id=1)
-        L->>C: OK
-    end
-
-    C->>L: AcquireLock(lock="job", lease_id=1)
-    L->>C: fencing_token=100
-
-    Note over C,R: Protected operation
-    C->>R: Write(data, token=100)
-    R->>R: Validate token >= last_seen
-    R->>C: Success
-
-    C->>L: ReleaseLock(lock="job")
-    L->>C: OK
-```
-
 ### Fencing Tokens Prevent Stale Writes
 
-```mermaid
-%%{init: {'theme':'dark'}}%%
-sequenceDiagram
-    participant A as Client A<br/>(paused)
-    participant B as Client B
-    participant L as lowkey
-    participant R as Protected Resource
+The token is a monotonically-increasing counter handed out at acquire time. The protected resource records the highest token it has seen and rejects any write with a lower one, so a stale lock holder coming back from a long pause cannot overwrite work done by the current holder.
 
-    A->>L: AcquireLock("db-backup")
-    L->>A: fencing_token=100
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pixperk/lowkey/main/assets/fencing.png" alt="Fencing tokens: Client A pauses, lease expires, Client B acquires with a higher token; A's late write is rejected because its token is lower" width="700">
+</p>
 
-    Note over A: GC pause (20s)
-    rect rgb(80, 40, 40)
-        Note over A,L: Lease expires!
-        L->>L: Release lock
-    end
-
-    B->>L: AcquireLock("db-backup")
-    L->>B: fencing_token=101
-
-    B->>R: Write(data, token=101)
-    R->>R: last_seen = 101
-    R->>B: Success
-
-    Note over A: Wakes up
-    A->>R: Write(data, token=100)
-    R->>R: 100 < 101 (stale!)
-    R->>A: Rejected
-```
-
-**Key insight:** The fencing token ensures even if a client holds a stale lock, the protected resource will reject its operations.
-
-### Architecture
-
-```mermaid
-%%{init: {'theme':'dark'}}%%
-graph TB
-    subgraph Clients
-        C1[Client A<br/>Python]
-        C2[Client B<br/>Go]
-        C3[Client C<br/>curl]
-    end
-
-    subgraph "lowkey Cluster"
-        subgraph "Node 1 (Leader)"
-            G1[gRPC :9000]
-            H1[HTTP :8080]
-            R1[Raft + FSM]
-            G1 --> R1
-            H1 --> G1
-        end
-
-        subgraph "Node 2 (Follower)"
-            G2[gRPC :9000]
-            H2[HTTP :8080]
-            R2[Raft + FSM]
-            G2 --> R2
-            H2 --> G2
-        end
-
-        subgraph "Node 3 (Follower)"
-            G3[gRPC :9000]
-            H3[HTTP :8080]
-            R3[Raft + FSM]
-            G3 --> R3
-            H3 --> G3
-        end
-
-        R1 -.Replicate.-> R2
-        R1 -.Replicate.-> R3
-    end
-
-    C1 -->|gRPC| G1
-    C2 -->|gRPC| G2
-    C3 -->|HTTP| H1
-
-    style R1 fill:#4a9eff
-    style R2 fill:#667
-    style R3 fill:#667
-```
+**Key insight:** Even if a client holds a stale lock, the protected resource will reject its operations.
 
 ---
 
@@ -519,6 +439,8 @@ graph TB
 | `/v1/lock/acquire` | POST | Acquire a lock (returns fencing token) |
 | `/v1/lock/release` | POST | Release a lock |
 | `/v1/status` | GET | Get cluster status and statistics |
+| `/v1/cluster/peers` | POST | Add a voting peer to the cluster (leader-only) |
+| `/v1/cluster/peers/{node_id}` | DELETE | Remove a peer from the cluster (leader-only) |
 
 ### gRPC API
 
@@ -530,10 +452,12 @@ service LockService {
     rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse);
     rpc ReleaseLock(ReleaseLockRequest) returns (ReleaseLockResponse);
     rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+    rpc AddPeer(AddPeerRequest) returns (AddPeerResponse);
+    rpc RemovePeer(RemovePeerRequest) returns (RemovePeerResponse);
 }
 ```
 
-**Note:** HTTP clients poll `/v1/lease/renew`, gRPC clients use `Heartbeat` stream for efficiency.
+**Note:** HTTP clients poll `/v1/lease/renew`, gRPC clients use the `Heartbeat` stream for efficiency.
 
 ---
 
@@ -544,23 +468,18 @@ service LockService {
 Using Go's built-in benchmark framework:
 
 ```bash
-# Throughput benchmarks
-make bench-all
-
-# Individual scenarios
-make bench-sequential   # Single client baseline
-make bench-parallel     # Multiple clients, unique locks
-make bench-contention   # Multiple clients competing
-
-# Latency percentiles (p50, p90, p99, p99.9)
-make bench-percentiles
+make bench-all                # throughput across scenarios
+make bench-sequential         # single client baseline
+make bench-parallel           # multiple clients, unique locks
+make bench-contention         # multiple clients competing
+make bench-percentiles        # p50, p90, p99, p99.9
 ```
 
-**Throughput Results** (AMD Ryzen 7 5800HS, 16 cores):
+**Throughput** (single-node lowkey on AMD Ryzen 7 5800HS):
 
 | Benchmark | Operations | Latency/op | Scenario |
 |-----------|-----------|------------|----------|
-| Sequential | 4,460 | 3.24ms | Single client, measures Raft consensus overhead |
+| Sequential | 4,460 | 3.24ms | Single client, measures Raft consensus + bbolt fsync overhead |
 | Parallel | 19,911 | 0.60ms | Multiple clients, unique locks (true throughput) |
 | Contention | 10,000 | 1.40ms | Multiple clients competing for same lock |
 
@@ -572,22 +491,16 @@ make bench-percentiles
 | Parallel | 4.4ms | 5.5ms | 7.0ms | 25ms |
 | Contention | 5.5ms | 6.5ms | 7.6ms | 7.6ms |
 
-**Key insights:**
-- **Consistent latency** - p99 is only ~2ms slower than p50 (no wild outliers)
-- **Sub-10ms p99** - 99% of locks acquired in under 10ms even with contention
-- Heartbeats bypass Raft (leader-only renewal) → minimal overhead
-- Lock acquire/release through Raft → strong consistency
-- Parallel throughput 5.4x faster than sequential
+> **Caveat:** These numbers are from a **single-node** lowkey, so the Raft `Apply` only touches local bbolt, no network replication. A 3-node cluster will pay an extra quorum round-trip per write. Treat the numbers as an upper bound, not a comparison against multi-node etcd/Consul deployments.
 
 ### Testing
 
 ```bash
-# Unit tests
-make test
-
-# Coverage report
-make test-coverage
+make test                     # unit + raft integration tests
+make test-coverage            # HTML coverage report
 ```
+
+Percentile benches require a live lowkey at `localhost:9000`; they skip cleanly when nothing is listening (so `go test ./...` stays green in CI).
 
 ---
 
@@ -597,61 +510,23 @@ make test-coverage
 
 lowkey exposes Prometheus metrics at `/metrics` for monitoring lock performance, cluster health, and resource usage.
 
-**Access metrics:**
 ```bash
 curl http://localhost:8080/metrics
 ```
 
 ### Quick Start with Docker Compose
 
-Run Prometheus and Grafana alongside lowkey with a single command:
-
-**1. Start the observability stack:**
 ```bash
-# using make (recommended)
-make obs-up
-
-# or using docker-compose directly
-docker-compose up -d
+make obs-up                   # starts Prometheus + Grafana
+./bin/lowkey --bootstrap --data-dir ./data
 ```
 
-**2. Start lowkey:**
-```bash
-# in a separate terminal
-./lowkey --bootstrap --data-dir ./data
-```
-
-**3. Access dashboards:**
-- **Grafana**: http://localhost:3000 (login: `admin` / `admin`)
+- **Grafana**: http://localhost:3000 (admin / admin)
 - **Prometheus**: http://localhost:9090
 
-**4. Import lowkey dashboard:**
+The lowkey dashboard is auto-provisioned from `grafana-provisioning/dashboards/lowkey-dashboard.json` (12 panels covering lock latency, cluster health, throughput, failures).
 
-In Grafana UI:
-1. Navigate to Dashboards → Import
-2. Click "Upload JSON file"
-3. Select `grafana-dashboard.json` from the lowkey directory
-4. Select "Prometheus" as the datasource
-5. Click "Import"
-
-The dashboard is now live with 12 panels tracking lock performance, cluster health, and system metrics.
-
-**What's included:**
-- **Prometheus** - Scrapes lowkey metrics every 5 seconds at `http://host.docker.internal:8080/metrics`
-- **Grafana** - Pre-configured with Prometheus datasource
-- **Dashboard JSON** - [grafana-dashboard.json](grafana-dashboard.json) ready to import
-- **Persistent storage** - Metrics and dashboards survive container restarts
-
-**Stop the stack:**
-```bash
-make obs-down
-# or: docker-compose down
-```
-
-**View logs:**
-```bash
-make obs-logs
-```
+**Stop the stack:** `make obs-down` &nbsp;·&nbsp; **Logs:** `make obs-logs`
 
 ### Available Metrics
 
@@ -660,16 +535,16 @@ make obs-logs
 | `lowkey_lock_acquire_duration_seconds` | Histogram | `lock_name` | Time taken to acquire a lock (p50/p90/p99) |
 | `lowkey_lock_acquire_total` | Counter | `lock_name`, `status` | Total lock acquisitions (success/failure) |
 | `lowkey_lock_release_total` | Counter | `lock_name` | Total lock releases |
-| `lowkey_locks_active` | Gauge | - | Currently held locks |
-| `lowkey_lease_create_total` | Counter | - | Total leases created |
-| `lowkey_lease_renew_total` | Counter | - | Total lease renewals (heartbeats) |
-| `lowkey_lease_expire_total` | Counter | - | Total lease expirations (client failures) |
-| `lowkey_leases_active` | Gauge | - | Currently active leases (connected clients) |
+| `lowkey_locks_active` | Gauge | none | Currently held locks |
+| `lowkey_lease_create_total` | Counter | none | Total leases created |
+| `lowkey_lease_renew_total` | Counter | none | Total lease renewals (heartbeats) |
+| `lowkey_lease_expire_total` | Counter | none | Total lease expirations (client failures) |
+| `lowkey_leases_active` | Gauge | none | Currently active leases (connected clients) |
 | `lowkey_heartbeat_total` | Counter | `status` | Heartbeat success/failure count |
-| `lowkey_raft_is_leader` | Gauge | - | Whether this node is leader (1) or follower (0) |
-| `lowkey_raft_peers` | Gauge | - | Number of peers in cluster |
-| `lowkey_raft_applied_index` | Gauge | - | Last Raft log index applied to FSM |
-| `lowkey_up` | Gauge | - | Service uptime (always 1 when running) |
+| `lowkey_raft_is_leader` | Gauge | none | Whether this node is leader (1) or follower (0) |
+| `lowkey_raft_peers` | Gauge | none | Number of peers in cluster |
+| `lowkey_raft_applied_index` | Gauge | none | Last Raft log index applied to FSM |
+| `lowkey_up` | Gauge | none | Service uptime (always 1 when running) |
 
 **Example Prometheus queries:**
 
@@ -694,100 +569,69 @@ rate(lowkey_lease_expire_total[5m])
 sum(lowkey_raft_is_leader)
 ```
 
-### Grafana Dashboard
-
-The [grafana-dashboard.json](grafana-dashboard.json) includes:
-- **Lock latency percentiles** - p50, p90, p99, p99.9 tracking
-- **Success rate monitoring** - Lock acquisition and heartbeat success %
-- **Active resource gauges** - Currently held locks and active leases
-- **Failure detection** - Lease expiration rate (client crashes) with alerts
-- **Operations throughput** - Lock acquire/release rates
-- **Raft cluster health** - Leader election status, cluster size, replication lag
-- **Lock contention analysis** - Per-lock-name request rates
-
-**Metric collection:**
-- Raft health metrics update every 5 seconds
-- FSM metrics update in real-time on each operation
-- All metrics scraped by Prometheus (default `/metrics` endpoint)
-
 ---
 
 ## Technical Details
 
-### Core Components
-
-**Raft Consensus Layer:**
+**Raft Consensus Layer**
 - HashiCorp Raft implementation
 - Leader election and log replication
 - Persistent storage with BoltDB
 - Automatic snapshots
 
-**Finite State Machine (FSM):**
+**Finite State Machine (FSM)**
 - Lease management with monotonic time
 - Lock acquisition with fencing tokens
 - Automatic cleanup on lease expiration
 
-**Dual API:**
+**Dual API**
 - gRPC with bidirectional streaming (efficient heartbeats)
 - HTTP REST with JSON (easy integration)
-- gRPC-Gateway for HTTP→gRPC translation
+- gRPC-Gateway for HTTP/gRPC translation
 
-### Why This Design?
+### Why this design?
 
-**Raft Consensus:**
-- Proven algorithm with well-understood failure modes
-- CP in CAP theorem (consistency over availability)
-- No split-brain under network partitions
-
-**Fencing Tokens:**
-- Monotonically increasing counters
-- Mathematical guarantee against stale writes
-- Protected resources validate tokens
-
-**Lease-based Locks:**
-- Automatic cleanup when clients crash
-- No manual intervention required
-- Configurable TTL per client
+- **Raft** is a proven algorithm with well-understood failure modes. CP in CAP, no split-brain under network partitions.
+- **Fencing tokens** are monotonically-increasing counters: a mathematical guarantee against stale writes, provided the protected resource validates them.
+- **Lease-based locks** clean themselves up when clients crash. No manual intervention needed, TTL is per client.
 
 ---
 
 ## Resources
 
-### Papers and Articles
+**Papers and articles**
+- [How to do distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) by Martin Kleppmann
+- [The Chubby lock service for loosely-coupled distributed systems](https://research.google/pubs/pub27897/) by Google Research
+- [In Search of an Understandable Consensus Algorithm](https://raft.github.io/raft.pdf), the Raft paper
 
-- [How to do distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) - Martin Kleppmann
-- [The Chubby lock service for loosely-coupled distributed systems](https://research.google/pubs/pub27897/) - Google Research
-- [In Search of an Understandable Consensus Algorithm](https://raft.github.io/raft.pdf) - Raft Paper
-
-### Implementations
-
-- [etcd](https://github.com/etcd-io/etcd) - Distributed KV store with locks
-- [Consul](https://github.com/hashicorp/consul) - Service mesh with distributed locks
-- [Chubby](https://research.google/pubs/pub27897/) - Google's distributed lock service
+**Implementations**
+- [etcd](https://github.com/etcd-io/etcd), distributed KV store with locks
+- [Consul](https://github.com/hashicorp/consul), service mesh with distributed locks
+- [Chubby](https://research.google/pubs/pub27897/), Google's distributed lock service
 
 ---
 
 ## Built With
 
-- [hashicorp/raft](https://github.com/hashicorp/raft) - Battle-tested Raft consensus implementation
-- [grpc-ecosystem/grpc-gateway](https://github.com/grpc-ecosystem/grpc-gateway) - HTTP/gRPC bidirectional translation
-- [bbolt](https://github.com/etcd-io/bbolt) - Embedded key-value database for persistent storage
-- [protobuf](https://protobuf.dev/) - Protocol Buffers for efficient serialization
+- [hashicorp/raft](https://github.com/hashicorp/raft), battle-tested Raft consensus implementation
+- [grpc-ecosystem/grpc-gateway](https://github.com/grpc-ecosystem/grpc-gateway), HTTP/gRPC bidirectional translation
+- [bbolt](https://github.com/etcd-io/bbolt), embedded key-value database for persistent storage
+- [protobuf](https://protobuf.dev/), Protocol Buffers for efficient serialization
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details
+MIT License, see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Contributing
 
-Contributions welcome! Please open an issue or submit a pull request.
+Contributions welcome. Open an issue or submit a pull request.
 
 **Areas for contribution:**
 - Client libraries for other languages (Python, Rust, Java)
-- Observability (Prometheus metrics, structured logging)
+- Observability (additional metrics, structured logging)
 - Integration tests and chaos engineering
 - Documentation and examples
