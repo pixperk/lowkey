@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/google/uuid"
 	pb "github.com/pixperk/lowkey/api/v1"
 	"github.com/pixperk/lowkey/pkg/fsm"
 	"github.com/pixperk/lowkey/pkg/raft"
@@ -158,6 +159,46 @@ func (s *Server) Heartbeat(stream pb.LockService_HeartbeatServer) error {
 			return err
 		}
 	}
+}
+
+func (s *Server) AddPeer(ctx context.Context, req *pb.AddPeerRequest) (*pb.AddPeerResponse, error) {
+	if !s.node.IsLeader() {
+		return nil, notLeaderError(s.node.GetLeader())
+	}
+
+	if req.NodeId == "" || req.RaftAddress == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id and raft_address are required")
+	}
+
+	nid, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid node_id: %v", err)
+	}
+
+	if err := s.node.AddPeer(nid, req.RaftAddress); err != nil {
+		return nil, status.Errorf(codes.Internal, "%v", err)
+	}
+	return &pb.AddPeerResponse{}, nil
+}
+
+func (s *Server) RemovePeer(ctx context.Context, req *pb.RemovePeerRequest) (*pb.RemovePeerResponse, error) {
+	if !s.node.IsLeader() {
+		return nil, notLeaderError(s.node.GetLeader())
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id required")
+	}
+
+	nid, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid node_id: %v", err)
+	}
+
+	if err := s.node.RemovePeer(nid); err != nil {
+		return nil, status.Errorf(codes.Internal, "%v", err)
+	}
+	return &pb.RemovePeerResponse{}, nil
 }
 
 func (s *Server) GetStatus(ctx context.Context, req *pb.GetStatusRequest) (*pb.GetStatusResponse, error) {

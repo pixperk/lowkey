@@ -698,6 +698,174 @@ func (x *Stats) GetFencingCounter() uint64 {
 	return 0
 }
 
+type AddPeerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`                // UUID of the joining node
+	RaftAddress   string                 `protobuf:"bytes,2,opt,name=raft_address,json=raftAddress,proto3" json:"raft_address,omitempty"` // Raft bind address of the joining node (host:port)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddPeerRequest) Reset() {
+	*x = AddPeerRequest{}
+	mi := &file_lock_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddPeerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddPeerRequest) ProtoMessage() {}
+
+func (x *AddPeerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lock_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddPeerRequest.ProtoReflect.Descriptor instead.
+func (*AddPeerRequest) Descriptor() ([]byte, []int) {
+	return file_lock_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AddPeerRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *AddPeerRequest) GetRaftAddress() string {
+	if x != nil {
+		return x.RaftAddress
+	}
+	return ""
+}
+
+type AddPeerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddPeerResponse) Reset() {
+	*x = AddPeerResponse{}
+	mi := &file_lock_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddPeerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddPeerResponse) ProtoMessage() {}
+
+func (x *AddPeerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lock_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddPeerResponse.ProtoReflect.Descriptor instead.
+func (*AddPeerResponse) Descriptor() ([]byte, []int) {
+	return file_lock_proto_rawDescGZIP(), []int{14}
+}
+
+type RemovePeerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // UUID of the node to remove
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovePeerRequest) Reset() {
+	*x = RemovePeerRequest{}
+	mi := &file_lock_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovePeerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovePeerRequest) ProtoMessage() {}
+
+func (x *RemovePeerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lock_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovePeerRequest.ProtoReflect.Descriptor instead.
+func (*RemovePeerRequest) Descriptor() ([]byte, []int) {
+	return file_lock_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RemovePeerRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type RemovePeerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovePeerResponse) Reset() {
+	*x = RemovePeerResponse{}
+	mi := &file_lock_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovePeerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovePeerResponse) ProtoMessage() {}
+
+func (x *RemovePeerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lock_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovePeerResponse.ProtoReflect.Descriptor instead.
+func (*RemovePeerResponse) Descriptor() ([]byte, []int) {
+	return file_lock_proto_rawDescGZIP(), []int{16}
+}
+
 var File_lock_proto protoreflect.FileDescriptor
 
 const file_lock_proto_rawDesc = "" +
@@ -746,7 +914,14 @@ const file_lock_proto_rawDesc = "" +
 	"\x05Stats\x12\x16\n" +
 	"\x06leases\x18\x01 \x01(\x05R\x06leases\x12\x14\n" +
 	"\x05locks\x18\x02 \x01(\x05R\x05locks\x12'\n" +
-	"\x0ffencing_counter\x18\x03 \x01(\x04R\x0efencingCounter2\xd6\x04\n" +
+	"\x0ffencing_counter\x18\x03 \x01(\x04R\x0efencingCounter\"L\n" +
+	"\x0eAddPeerRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12!\n" +
+	"\fraft_address\x18\x02 \x01(\tR\vraftAddress\"\x11\n" +
+	"\x0fAddPeerResponse\",\n" +
+	"\x11RemovePeerRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\x14\n" +
+	"\x12RemovePeerResponse2\xa6\x06\n" +
 	"\vLockService\x12b\n" +
 	"\vCreateLease\x12\x1d.lowkey.v1.CreateLeaseRequest\x1a\x1e.lowkey.v1.CreateLeaseResponse\"\x14\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/lease\x12e\n" +
 	"\n" +
@@ -755,7 +930,10 @@ const file_lock_proto_rawDesc = "" +
 	"\vAcquireLock\x12\x1d.lowkey.v1.AcquireLockRequest\x1a\x1e.lowkey.v1.AcquireLockResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/lock/acquire\x12i\n" +
 	"\vReleaseLock\x12\x1d.lowkey.v1.ReleaseLockRequest\x1a\x1e.lowkey.v1.ReleaseLockResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/lock/release\x12Z\n" +
 	"\tGetStatus\x12\x1b.lowkey.v1.GetStatusRequest\x1a\x1c.lowkey.v1.GetStatusResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/v1/statusB\"Z github.com/pixperk/lowkey/api/v1b\x06proto3"
+	"/v1/status\x12^\n" +
+	"\aAddPeer\x12\x19.lowkey.v1.AddPeerRequest\x1a\x1a.lowkey.v1.AddPeerResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/cluster/peers\x12n\n" +
+	"\n" +
+	"RemovePeer\x12\x1c.lowkey.v1.RemovePeerRequest\x1a\x1d.lowkey.v1.RemovePeerResponse\"#\x82\xd3\xe4\x93\x02\x1d*\x1b/v1/cluster/peers/{node_id}B\"Z github.com/pixperk/lowkey/api/v1b\x06proto3"
 
 var (
 	file_lock_proto_rawDescOnce sync.Once
@@ -769,7 +947,7 @@ func file_lock_proto_rawDescGZIP() []byte {
 	return file_lock_proto_rawDescData
 }
 
-var file_lock_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_lock_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_lock_proto_goTypes = []any{
 	(*CreateLeaseRequest)(nil),  // 0: lowkey.v1.CreateLeaseRequest
 	(*CreateLeaseResponse)(nil), // 1: lowkey.v1.CreateLeaseResponse
@@ -784,6 +962,10 @@ var file_lock_proto_goTypes = []any{
 	(*GetStatusRequest)(nil),    // 10: lowkey.v1.GetStatusRequest
 	(*GetStatusResponse)(nil),   // 11: lowkey.v1.GetStatusResponse
 	(*Stats)(nil),               // 12: lowkey.v1.Stats
+	(*AddPeerRequest)(nil),      // 13: lowkey.v1.AddPeerRequest
+	(*AddPeerResponse)(nil),     // 14: lowkey.v1.AddPeerResponse
+	(*RemovePeerRequest)(nil),   // 15: lowkey.v1.RemovePeerRequest
+	(*RemovePeerResponse)(nil),  // 16: lowkey.v1.RemovePeerResponse
 }
 var file_lock_proto_depIdxs = []int32{
 	12, // 0: lowkey.v1.GetStatusResponse.stats:type_name -> lowkey.v1.Stats
@@ -793,14 +975,18 @@ var file_lock_proto_depIdxs = []int32{
 	6,  // 4: lowkey.v1.LockService.AcquireLock:input_type -> lowkey.v1.AcquireLockRequest
 	8,  // 5: lowkey.v1.LockService.ReleaseLock:input_type -> lowkey.v1.ReleaseLockRequest
 	10, // 6: lowkey.v1.LockService.GetStatus:input_type -> lowkey.v1.GetStatusRequest
-	1,  // 7: lowkey.v1.LockService.CreateLease:output_type -> lowkey.v1.CreateLeaseResponse
-	3,  // 8: lowkey.v1.LockService.RenewLease:output_type -> lowkey.v1.RenewLeaseResponse
-	5,  // 9: lowkey.v1.LockService.Heartbeat:output_type -> lowkey.v1.HeartbeatResponse
-	7,  // 10: lowkey.v1.LockService.AcquireLock:output_type -> lowkey.v1.AcquireLockResponse
-	9,  // 11: lowkey.v1.LockService.ReleaseLock:output_type -> lowkey.v1.ReleaseLockResponse
-	11, // 12: lowkey.v1.LockService.GetStatus:output_type -> lowkey.v1.GetStatusResponse
-	7,  // [7:13] is the sub-list for method output_type
-	1,  // [1:7] is the sub-list for method input_type
+	13, // 7: lowkey.v1.LockService.AddPeer:input_type -> lowkey.v1.AddPeerRequest
+	15, // 8: lowkey.v1.LockService.RemovePeer:input_type -> lowkey.v1.RemovePeerRequest
+	1,  // 9: lowkey.v1.LockService.CreateLease:output_type -> lowkey.v1.CreateLeaseResponse
+	3,  // 10: lowkey.v1.LockService.RenewLease:output_type -> lowkey.v1.RenewLeaseResponse
+	5,  // 11: lowkey.v1.LockService.Heartbeat:output_type -> lowkey.v1.HeartbeatResponse
+	7,  // 12: lowkey.v1.LockService.AcquireLock:output_type -> lowkey.v1.AcquireLockResponse
+	9,  // 13: lowkey.v1.LockService.ReleaseLock:output_type -> lowkey.v1.ReleaseLockResponse
+	11, // 14: lowkey.v1.LockService.GetStatus:output_type -> lowkey.v1.GetStatusResponse
+	14, // 15: lowkey.v1.LockService.AddPeer:output_type -> lowkey.v1.AddPeerResponse
+	16, // 16: lowkey.v1.LockService.RemovePeer:output_type -> lowkey.v1.RemovePeerResponse
+	9,  // [9:17] is the sub-list for method output_type
+	1,  // [1:9] is the sub-list for method input_type
 	1,  // [1:1] is the sub-list for extension type_name
 	1,  // [1:1] is the sub-list for extension extendee
 	0,  // [0:1] is the sub-list for field type_name
@@ -817,7 +1003,7 @@ func file_lock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lock_proto_rawDesc), len(file_lock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

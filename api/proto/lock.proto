@@ -47,6 +47,20 @@ service LockService{
             get: "/v1/status"
         };
     }
+
+    //cluster membership
+    rpc AddPeer(AddPeerRequest) returns (AddPeerResponse) {
+        option (google.api.http) = {
+            post: "/v1/cluster/peers"
+            body: "*"
+        };
+    }
+
+    rpc RemovePeer(RemovePeerRequest) returns (RemovePeerResponse) {
+        option (google.api.http) = {
+            delete: "/v1/cluster/peers/{node_id}"
+        };
+    }
 }
 
 message CreateLeaseRequest {
@@ -113,3 +127,16 @@ message Stats {
   int32 locks = 2;              // Number of active locks
   uint64 fencing_counter = 3;   // Current fencing counter value
 }
+
+message AddPeerRequest {
+  string node_id = 1;        // UUID of the joining node
+  string raft_address = 2;   // Raft bind address of the joining node (host:port)
+}
+
+message AddPeerResponse {}
+
+message RemovePeerRequest {
+  string node_id = 1;        // UUID of the node to remove
+}
+
+message RemovePeerResponse {}

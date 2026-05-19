@@ -56,6 +56,7 @@ func (s *latencyStats) calculate() map[string]time.Duration {
 }
 
 func TestPercentileSequential(t *testing.T) {
+	requireServer(t)
 	c, err := client.NewClient(serverAddr, "percentile-sequential")
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
@@ -87,6 +88,7 @@ func TestPercentileSequential(t *testing.T) {
 }
 
 func TestPercentileParallel(t *testing.T) {
+	requireServer(t)
 	const numClients = 3
 	iterations := 1000
 	stats := &latencyStats{}
@@ -131,6 +133,7 @@ func TestPercentileParallel(t *testing.T) {
 }
 
 func TestPercentileContention(t *testing.T) {
+	requireServer(t)
 	const numClients = 3
 	lockName := "percentile-lock-contention"
 	iterations := 300

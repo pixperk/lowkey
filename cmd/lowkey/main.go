@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 	pb "github.com/pixperk/lowkey/api/v1"
@@ -15,6 +16,7 @@ import (
 	"github.com/pixperk/lowkey/pkg/raft"
 	"github.com/pixperk/lowkey/pkg/server"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -25,8 +27,13 @@ func main() {
 		httpAddr  = flag.String("http-addr", ":8080", "HTTP gateway address")
 		dataDir   = flag.String("data-dir", "./data", "Data directory for Raft storage")
 		bootstrap = flag.Bool("bootstrap", false, "Bootstrap a new cluster")
+		joinAddr  = flag.String("join", "", "gRPC address of an existing cluster member to join (e.g. 127.0.0.1:9000)")
 	)
 	flag.Parse()
+
+	if *bootstrap && *joinAddr != "" {
+		log.Fatal(":( cannot use --bootstrap and --join together")
+	}
 
 	var nid uuid.UUID
 	var err error
@@ -53,6 +60,7 @@ func main() {
 		BindAddr:  *raftAddr,
 		DataDir:   *dataDir,
 		Bootstrap: *bootstrap,
+		JoinAddr:  *joinAddr,
 	})
 	if err != nil {
 		log.Fatalf("Failed to create Raft node: %v", err)
@@ -88,6 +96,13 @@ func main() {
 		}
 	}()
 
+	if *joinAddr != "" {
+		if err := joinCluster(*joinAddr, nid, *raftAddr); err != nil {
+			log.Fatalf(":( failed to join cluster via %s: %v", *joinAddr, err)
+		}
+		log.Printf("OwO joined cluster via %s", *joinAddr)
+	}
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -102,4 +117,24 @@ func main() {
 	gwServer.Stop(context.Background())
 
 	log.Println(":} Shutdown complete")
+}
+
+// joinCluster dials an existing cluster member's gRPC endpoint and asks it
+// to add this node as a voter.
+func joinCluster(peerGRPCAddr string, nodeID uuid.UUID, raftAddr string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := grpc.NewClient(peerGRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	client := pb.NewLockServiceClient(conn)
+	_, err = client.AddPeer(ctx, &pb.AddPeerRequest{
+		NodeId:      nodeID.String(),
+		RaftAddress: raftAddr,
+	})
+	return err
 }

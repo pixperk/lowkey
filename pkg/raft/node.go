@@ -33,6 +33,7 @@ type Config struct {
 	BindAddr  string    //net addr to bind Raft communication
 	DataDir   string    //data directory for Raft storage
 	Bootstrap bool      //if this is the first node in the cluster
+	JoinAddr  string    //gRPC address of an existing cluster member to join (optional)
 }
 
 func NewNode(cfg *Config) (*Node, error) {
@@ -202,6 +203,30 @@ func (n *Node) WaitForLeader(timeout time.Duration) error {
 // returns FSM statistics
 func (n *Node) Stats() fsm.Stats {
 	return n.fsm.Stats()
+}
+
+// AddPeer adds a voting peer to the Raft cluster. Leader-only.
+func (n *Node) AddPeer(nodeID uuid.UUID, raftAddr string) error {
+	if !n.IsLeader() {
+		return fmt.Errorf("not leader")
+	}
+	future := n.raft.AddVoter(raft.ServerID(nodeID.String()), raft.ServerAddress(raftAddr), 0, 10*time.Second)
+	if err := future.Error(); err != nil {
+		return fmt.Errorf("failed to add voter: %w", err)
+	}
+	return nil
+}
+
+// RemovePeer removes a peer from the Raft cluster. Leader-only.
+func (n *Node) RemovePeer(nodeID uuid.UUID) error {
+	if !n.IsLeader() {
+		return fmt.Errorf("not leader")
+	}
+	future := n.raft.RemoveServer(raft.ServerID(nodeID.String()), 0, 10*time.Second)
+	if err := future.Error(); err != nil {
+		return fmt.Errorf("failed to remove server: %w", err)
+	}
+	return nil
 }
 
 // gracefully shuts down the Raft node
