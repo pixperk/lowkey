@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,7 +18,9 @@ import (
 	"github.com/pixperk/lowkey/pkg/raft"
 	"github.com/pixperk/lowkey/pkg/server"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -27,7 +31,7 @@ func main() {
 		httpAddr  = flag.String("http-addr", ":8080", "HTTP gateway address")
 		dataDir   = flag.String("data-dir", "./data", "Data directory for Raft storage")
 		bootstrap = flag.Bool("bootstrap", false, "Bootstrap a new cluster")
-		joinAddr  = flag.String("join", "", "gRPC address of an existing cluster member to join (e.g. 127.0.0.1:9000)")
+		joinAddr  = flag.String("join", "", "Comma-separated gRPC seed addresses of existing cluster members (e.g. 127.0.0.1:9000,127.0.0.1:9001)")
 	)
 	flag.Parse()
 
@@ -97,10 +101,12 @@ func main() {
 	}()
 
 	if *joinAddr != "" {
-		if err := joinCluster(*joinAddr, nid, *raftAddr); err != nil {
-			log.Fatalf(":( failed to join cluster via %s: %v", *joinAddr, err)
+		seeds := splitSeeds(*joinAddr)
+		usedSeed, err := joinCluster(seeds, nid, *raftAddr)
+		if err != nil {
+			log.Fatalf(":( failed to join cluster via %v: %v", seeds, err)
 		}
-		log.Printf("OwO joined cluster via %s", *joinAddr)
+		log.Printf("OwO joined cluster via %s", usedSeed)
 	}
 
 	sigCh := make(chan os.Signal, 1)
@@ -119,9 +125,48 @@ func main() {
 	log.Println(":} Shutdown complete")
 }
 
-// joinCluster dials an existing cluster member's gRPC endpoint and asks it
-// to add this node as a voter.
-func joinCluster(peerGRPCAddr string, nodeID uuid.UUID, raftAddr string) error {
+// splitSeeds parses a comma-separated list of gRPC addresses, trimming whitespace
+// and dropping empties.
+func splitSeeds(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// joinCluster tries each seed gRPC address in order, asking it to add this node
+// as a voter. If a seed responds with NotLeader (codes.Unavailable), the next
+// seed is tried — so the caller can list several known cluster members and the
+// join succeeds as long as one of them is (or knows of) the leader.
+// Returns the seed that accepted the join.
+func joinCluster(seeds []string, nodeID uuid.UUID, raftAddr string) (string, error) {
+	if len(seeds) == 0 {
+		return "", fmt.Errorf("no seed addresses provided")
+	}
+
+	var lastErr error
+	for _, seed := range seeds {
+		err := tryAddPeer(seed, nodeID, raftAddr)
+		if err == nil {
+			return seed, nil
+		}
+		lastErr = fmt.Errorf("%s: %w", seed, err)
+		// If the seed told us it's not the leader, move on to the next seed.
+		if status.Code(err) == codes.Unavailable {
+			log.Printf("seed %s is not leader, trying next", seed)
+			continue
+		}
+		// Any other error: also try the next seed but keep the last error.
+		log.Printf("seed %s rejected join: %v", seed, err)
+	}
+	return "", lastErr
+}
+
+func tryAddPeer(peerGRPCAddr string, nodeID uuid.UUID, raftAddr string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

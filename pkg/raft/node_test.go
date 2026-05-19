@@ -319,6 +319,106 @@ func TestLeaderElection(t *testing.T) {
 	assert.NotZero(t, createResp.LeaseID, "lease ID should not be zero from new leader")
 }
 
+func TestAddPeer(t *testing.T) {
+	cfgs := make([]*Config, 2)
+	for i := 0; i < 2; i++ {
+		cfgs[i] = &Config{
+			NodeID:    uuid.New(),
+			BindAddr:  fmt.Sprintf("127.0.0.1:%d", 11000+i),
+			DataDir:   filepath.Join(t.TempDir(), fmt.Sprintf("node%d", i)),
+			Bootstrap: i == 0,
+		}
+	}
+
+	leader, err := NewNode(cfgs[0])
+	require.NoError(t, err)
+	defer leader.Shutdown()
+
+	require.NoError(t, leader.WaitForLeader(5*time.Second))
+	require.True(t, leader.IsLeader())
+
+	follower, err := NewNode(cfgs[1])
+	require.NoError(t, err)
+	defer follower.Shutdown()
+
+	require.NoError(t, leader.AddPeer(cfgs[1].NodeID, cfgs[1].BindAddr))
+	require.Equal(t, 2, leader.GetClusterSize())
+
+	// Apply via leader and verify replication to the new peer.
+	result, err := leader.Apply(types.CreateLeaseCmd{OwnerID: "client", TTL: 10 * time.Second})
+	require.NoError(t, err)
+	require.NotZero(t, result.(fsm.CreateLeaseResponse).LeaseID)
+
+	require.Eventually(t, func() bool {
+		return follower.Stats().Leases == 1
+	}, 3*time.Second, 50*time.Millisecond, "follower should replicate lease")
+}
+
+func TestAddPeerNotLeader(t *testing.T) {
+	cfgs := make([]*Config, 2)
+	for i := 0; i < 2; i++ {
+		cfgs[i] = &Config{
+			NodeID:    uuid.New(),
+			BindAddr:  fmt.Sprintf("127.0.0.1:%d", 11100+i),
+			DataDir:   filepath.Join(t.TempDir(), fmt.Sprintf("node%d", i)),
+			Bootstrap: i == 0,
+		}
+	}
+
+	leader, err := NewNode(cfgs[0])
+	require.NoError(t, err)
+	defer leader.Shutdown()
+	require.NoError(t, leader.WaitForLeader(5*time.Second))
+
+	follower, err := NewNode(cfgs[1])
+	require.NoError(t, err)
+	defer follower.Shutdown()
+
+	require.NoError(t, leader.AddPeer(cfgs[1].NodeID, cfgs[1].BindAddr))
+
+	// AddPeer on the follower must be rejected.
+	err = follower.AddPeer(uuid.New(), "127.0.0.1:11199")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not leader")
+}
+
+func TestRemovePeer(t *testing.T) {
+	nodes := make([]*Node, 3)
+	cfgs := make([]*Config, 3)
+	for i := 0; i < 3; i++ {
+		cfgs[i] = &Config{
+			NodeID:    uuid.New(),
+			BindAddr:  fmt.Sprintf("127.0.0.1:%d", 11200+i),
+			DataDir:   filepath.Join(t.TempDir(), fmt.Sprintf("node%d", i)),
+			Bootstrap: i == 0,
+		}
+	}
+
+	var err error
+	nodes[0], err = NewNode(cfgs[0])
+	require.NoError(t, err)
+	defer nodes[0].Shutdown()
+	require.NoError(t, nodes[0].WaitForLeader(5*time.Second))
+
+	for i := 1; i < 3; i++ {
+		nodes[i], err = NewNode(cfgs[i])
+		require.NoError(t, err)
+		defer nodes[i].Shutdown()
+		require.NoError(t, nodes[0].AddPeer(cfgs[i].NodeID, cfgs[i].BindAddr))
+	}
+	require.Equal(t, 3, nodes[0].GetClusterSize())
+
+	require.NoError(t, nodes[0].RemovePeer(cfgs[2].NodeID))
+
+	require.Eventually(t, func() bool {
+		return nodes[0].GetClusterSize() == 2
+	}, 3*time.Second, 50*time.Millisecond, "cluster should shrink to 2")
+
+	// Cluster should still be writable.
+	_, err = nodes[0].Apply(types.CreateLeaseCmd{OwnerID: "client", TTL: 10 * time.Second})
+	require.NoError(t, err)
+}
+
 func TestSnapshotAndRestore(t *testing.T) {
 	tmpDir := t.TempDir()
 	nodeID := uuid.New()

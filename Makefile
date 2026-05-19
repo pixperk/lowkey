@@ -1,4 +1,13 @@
-.PHONY: proto test bench
+.PHONY: proto test bench build install clean
+
+build:
+	go build -o bin/lowkey ./cmd/lowkey
+
+install:
+	go install ./cmd/lowkey
+
+clean:
+	rm -rf bin/
 
 proto:
 	# Generate internal command types
