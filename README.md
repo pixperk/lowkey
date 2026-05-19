@@ -6,7 +6,7 @@
 
 *Strong consistency for distributed mutual exclusion*
 
-[Quick Start](#quick-start) · [Go SDK](#go-sdk) · [Examples](#production-examples) · [API](#api-reference)
+[Quick Start](#quick-start) · [Go SDK](#go-sdk) · [Examples](#production-examples) · [API](#api-reference) · [Blog post](https://www.pixperk.tech/blog/lowkey-distributed-lock-service)
 
 </div>
 
@@ -33,6 +33,8 @@ lowkey is layered: client SDK on top, gRPC + HTTP gateway in the middle, HashiCo
 - **Fencing tokens**, monotonically increasing counters that prevent stale writes
 - **Automatic cleanup**, lease-based locks release automatically on client failure
 
+> **Deep dive:** [Building lowkey, a distributed lock service in Go](https://www.pixperk.tech/blog/lowkey-distributed-lock-service). Covers the CP trade-off, why fencing tokens matter, the leader-only heartbeat fast path, and the design choices that shaped the implementation.
+
 ---
 
 ## Why lowkey?
@@ -46,6 +48,12 @@ lowkey is layered: client SDK on top, gRPC + HTTP gateway in the middle, HashiCo
 1. **Raft consensus**: only the majority partition can acquire locks
 2. **Fencing tokens**: resources reject operations from stale lock holders
 3. **Leases**: locks auto-release when clients stop heartbeating
+
+Raft is a majority-vote protocol: a write is committed only when a quorum of nodes agrees. A minority partition cannot reach quorum, so it cannot grant new locks. This is what kills split-brain.
+
+<p align="center">
+  <img src="https://cdn.hashnode.com/res/hashnode/image/upload/v1766931301951/dda8af47-9bbf-4459-9248-207ed2384636.png" alt="Raft consensus: a jury of nodes voting; a write commits only when the majority agrees" width="600">
+</p>
 
 **Comparison with alternatives:**
 
@@ -416,6 +424,14 @@ Membership RPCs are leader-only; non-leaders return `NotLeader` (gRPC `Unavailab
 
 ## How It Works
 
+### Lease Lifecycle
+
+A client first asks for a lease with a TTL. While the lease is alive, the client can acquire and release locks under it. To keep the lease alive past its TTL, the client sends periodic heartbeats (renewals every TTL/3 in the SDK). If the heartbeats stop, the lease expires and the server automatically releases any locks the lease held. This is how lowkey cleans up after crashed clients without any manual intervention.
+
+<p align="center">
+  <img src="https://cdn.hashnode.com/res/hashnode/image/upload/v1766934003593/1a500273-5c4a-4a8e-9073-9ff3ed35f7a3.png" alt="Lease timeline: client creates lease, heartbeats renew it, client crashes, TTL elapses, server expires the lease and releases locks" width="700">
+</p>
+
 ### Fencing Tokens Prevent Stale Writes
 
 The token is a monotonically-increasing counter handed out at acquire time. The protected resource records the highest token it has seen and rejects any write with a lower one, so a stale lock holder coming back from a long pause cannot overwrite work done by the current holder.
@@ -425,6 +441,14 @@ The token is a monotonically-increasing counter handed out at acquire time. The 
 </p>
 
 **Key insight:** Even if a client holds a stale lock, the protected resource will reject its operations.
+
+### Why Monotonic Time
+
+lowkey decides lease expiry by comparing timestamps. If it used wall time, an NTP correction or a manual clock change could move "now" backwards and either expire leases early or keep dead leases alive. lowkey uses a monotonic clock that only ever moves forward, measured from a fixed epoch. Wall time is for logs and humans; it is not safe for invariants.
+
+<p align="center">
+  <img src="https://cdn.hashnode.com/res/hashnode/image/upload/v1766926993551/6006d121-3262-4d70-95a6-87cd9efd0e06.png" alt="Time is a lie: wall clocks can jump forwards, backwards, or stutter; lowkey uses a monotonic clock for lease expiry" width="600">
+</p>
 
 ---
 
@@ -598,6 +622,9 @@ sum(lowkey_raft_is_leader)
 ---
 
 ## Resources
+
+**About lowkey**
+- [Building lowkey, a distributed lock service in Go](https://www.pixperk.tech/blog/lowkey-distributed-lock-service), the design walkthrough behind this repo
 
 **Papers and articles**
 - [How to do distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) by Martin Kleppmann
