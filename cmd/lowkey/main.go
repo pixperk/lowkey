@@ -76,7 +76,11 @@ func main() {
 		}
 	}()
 
-	gwServer := gateway.NewServer(*httpAddr, "localhost"+*grpcAddr)
+	_, grpcPort, err := net.SplitHostPort(*grpcAddr)
+	if err != nil {
+		log.Fatalf(":( invalid grpc-addr %q: %v", *grpcAddr, err)
+	}
+	gwServer := gateway.NewServer(*httpAddr, net.JoinHostPort("localhost", grpcPort))
 	go func() {
 		log.Printf("OwO HTTP gateway listening on %s", *httpAddr)
 		if err := gwServer.Start(context.Background()); err != nil {
